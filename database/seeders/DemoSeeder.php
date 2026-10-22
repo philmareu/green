@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\PlaidItem;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Categories\StarterCategories;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -49,6 +50,8 @@ class DemoSeeder extends Seeder
 
         $business = Book::factory()->for($user)->business()->create(['name' => 'Acme Consulting LLC']);
         $personal = Book::factory()->for($user)->personal()->create(['name' => 'Personal']);
+
+        app(StarterCategories::class)->createSetsFor($user);
 
         // One bank login holding both a business and a personal account.
         $bank = PlaidItem::factory()->for($user)->create([

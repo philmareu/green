@@ -45,6 +45,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(PlaidItem::class);
     }
 
+    /** @return HasMany<CategorySet, $this> */
+    public function categorySets(): HasMany
+    {
+        return $this->hasMany(CategorySet::class);
+    }
+
     /**
      * Green is self-hosted: every user created on this install may sign in.
      */

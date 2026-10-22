@@ -9,6 +9,7 @@ use App\Filament\Resources\Books\RelationManagers\AccountsRelationManager;
 use App\Filament\Resources\Books\RelationManagers\TransactionsRelationManager;
 use App\Models\Account;
 use App\Models\Book;
+use App\Models\CategorySet;
 use App\Models\Transaction;
 use App\Models\User;
 use Livewire\Livewire;
@@ -38,6 +39,27 @@ it('creates a Book for the signed-in user', function () {
 
     expect($book->user_id)->toBe($this->user->id)
         ->and($book->kind)->toBe(BookKind::Business);
+});
+
+it('suggests the category set matching a new Book’s kind', function () {
+    $businessSet = CategorySet::factory()->for($this->user)->business()->create();
+    $personalSet = CategorySet::factory()->for($this->user)->personal()->create();
+
+    Livewire::test(CreateBook::class)
+        ->assertSchemaStateSet(['category_set_id' => $businessSet->id])
+        ->fillForm(['name' => 'Household', 'kind' => BookKind::Personal->value])
+        ->assertSchemaStateSet(['category_set_id' => $personalSet->id])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Book::sole()->category_set_id)->toBe($personalSet->id);
+});
+
+it('will not use someone else’s category set', function () {
+    Livewire::test(CreateBook::class)
+        ->fillForm(['name' => 'Acme', 'kind' => BookKind::Business->value, 'category_set_id' => CategorySet::factory()->create()->id])
+        ->call('create')
+        ->assertHasFormErrors(['category_set_id']);
 });
 
 it('requires a name', function () {

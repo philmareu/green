@@ -14,7 +14,7 @@ class BooksTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('accounts')->withCount('accounts'))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['accounts', 'categorySet'])->withCount('accounts'))
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
@@ -22,6 +22,10 @@ class BooksTable
                     ->weight('medium'),
                 TextColumn::make('kind')
                     ->badge(),
+                TextColumn::make('categorySet.name')
+                    ->label('Categories')
+                    ->placeholder('None')
+                    ->toggleable(),
                 TextColumn::make('accounts_count')
                     ->label('Accounts')
                     ->numeric(),

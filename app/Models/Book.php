@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Collection;
 
-#[Fillable(['user_id', 'name', 'kind'])]
+#[Fillable(['user_id', 'name', 'kind', 'category_set_id'])]
 class Book extends Model
 {
     /** @use HasFactory<BookFactory> */
@@ -31,6 +31,12 @@ class Book extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** @return BelongsTo<CategorySet, $this> */
+    public function categorySet(): BelongsTo
+    {
+        return $this->belongsTo(CategorySet::class);
     }
 
     /** @return HasMany<Account, $this> */

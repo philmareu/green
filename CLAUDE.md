@@ -7,7 +7,8 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - `User` → `Book` (business/personal) → `Account` → `Transaction`.
 - `PlaidItem` = one bank login, owned by a **User**, not a Book. Its accounts can sit in different Books; `accounts.book_id` is nullable ("Unassigned").
 - `transactions.amount` keeps **Plaid's sign: positive = money out**. Display with `Transaction::signed_amount`. Never flip it in storage.
-- Every user-reachable query is scoped with the `ownedBy($user)` model scopes (Books and Items by `user_id`; Accounts and Transactions through `plaidItem.user_id`). Filament resources apply it in `getEloquentQuery()`.
+- `CategorySet` (owned by a User, kind business/personal) → `Category`. Each Book picks one set (`books.category_set_id`, nullable); sets can be shared. Categories nest one level (`parent_id`), and a subcategory always takes its parent's `type` (income/expense/transfer), enforced in `Category::booted()`. Starter lists live in `app/Services/Categories/StarterCategories.php` (business = IRS Schedule C lines). Plaid's own category is kept separately on `transactions.category_primary`/`category_detailed`.
+- Every user-reachable query is scoped with the `ownedBy($user)` model scopes (Books, Items and CategorySets by `user_id`; Accounts and Transactions through `plaidItem.user_id`; Categories through `categorySet.user_id`). Filament resources apply it in `getEloquentQuery()`.
 
 ## Plaid
 
