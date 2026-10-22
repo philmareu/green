@@ -35,4 +35,21 @@ return [
         ],
     ],
 
+    'plaid' => [
+        'client_id' => env('PLAID_CLIENT_ID'),
+        'secret' => env('PLAID_SECRET'),
+        'env' => env('PLAID_ENV', 'sandbox'),
+        'base_urls' => [
+            'sandbox' => 'https://sandbox.plaid.com',
+            'production' => 'https://production.plaid.com',
+        ],
+        'client_name' => env('PLAID_CLIENT_NAME', env('APP_NAME', 'Green')),
+        'products' => array_filter(explode(',', env('PLAID_PRODUCTS', 'transactions'))),
+        'country_codes' => array_filter(explode(',', env('PLAID_COUNTRY_CODES', 'US'))),
+        'language' => env('PLAID_LANGUAGE', 'en'),
+        'days_requested' => (int) env('PLAID_DAYS_REQUESTED', 90),
+        'redirect_uri' => env('PLAID_REDIRECT_URI'),
+        'timeout' => (int) env('PLAID_TIMEOUT', 60),
+    ],
+
 ];

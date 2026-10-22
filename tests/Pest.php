@@ -1,50 +1,98 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-/*
-|--------------------------------------------------------------------------
-| Test Case
-|--------------------------------------------------------------------------
-|
-| The closure you provide to your test functions is always bound to a specific PHPUnit test
-| case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
-| need to change it using the "pest()" function to bind different classes or traits.
-|
-*/
-
 pest()->extend(TestCase::class)
- // ->use(RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
+    ->beforeEach(fn () => Http::preventStrayRequests())
     ->in('Feature');
 
 /*
 |--------------------------------------------------------------------------
-| Expectations
+| Plaid API fixtures
 |--------------------------------------------------------------------------
 |
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
+| Shapes follow https://plaid.com/docs/api/. Only the fields Green reads are
+| included.
 |
 */
 
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
+const PLAID = 'https://sandbox.plaid.com';
 
-/*
-|--------------------------------------------------------------------------
-| Functions
-|--------------------------------------------------------------------------
-|
-| While Pest is very powerful out-of-the-box, you may have some testing code specific to your
-| project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
-|
-*/
-
-function something()
+function plaidAccount(array $overrides = []): array
 {
-    // ..
+    return array_replace_recursive([
+        'account_id' => 'acc-checking',
+        'name' => 'Plaid Checking',
+        'official_name' => 'Plaid Gold Standard 0% Interest Checking',
+        'mask' => '0000',
+        'type' => 'depository',
+        'subtype' => 'checking',
+        'balances' => [
+            'available' => 100.00,
+            'current' => 110.00,
+            'limit' => null,
+            'iso_currency_code' => 'USD',
+            'unofficial_currency_code' => null,
+        ],
+    ], $overrides);
+}
+
+function plaidTransaction(array $overrides = []): array
+{
+    return array_replace([
+        'transaction_id' => 'tx-1',
+        'account_id' => 'acc-checking',
+        'amount' => 12.50,
+        'iso_currency_code' => 'USD',
+        'unofficial_currency_code' => null,
+        'date' => '2026-10-20',
+        'authorized_date' => '2026-10-19',
+        'name' => 'STARBUCKS STORE 1234',
+        'merchant_name' => 'Starbucks',
+        'pending' => false,
+        'pending_transaction_id' => null,
+        'personal_finance_category' => ['primary' => 'FOOD_AND_DRINK', 'detailed' => 'FOOD_AND_DRINK_COFFEE'],
+        'payment_channel' => 'in store',
+    ], $overrides);
+}
+
+/**
+ * One /transactions/sync response page.
+ */
+function syncPage(
+    array $added = [],
+    array $modified = [],
+    array $removed = [],
+    bool $hasMore = false,
+    string $nextCursor = 'cursor-final',
+    ?array $accounts = null,
+    string $status = 'HISTORICAL_UPDATE_COMPLETE',
+): array {
+    return [
+        'added' => $added,
+        'modified' => $modified,
+        'removed' => array_map(fn (string $id) => ['transaction_id' => $id, 'account_id' => 'acc-checking'], $removed),
+        'accounts' => $accounts ?? [plaidAccount()],
+        'has_more' => $hasMore,
+        'next_cursor' => $nextCursor,
+        'transactions_update_status' => $status,
+        'request_id' => 'req-sync',
+    ];
+}
+
+function plaidError(string $code, string $type = 'ITEM_ERROR', int $status = 400, ?string $displayMessage = null): array
+{
+    return [
+        'body' => [
+            'error_type' => $type,
+            'error_code' => $code,
+            'error_message' => "Plaid error {$code}",
+            'display_message' => $displayMessage,
+            'request_id' => 'req-error',
+        ],
+        'status' => $status,
+    ];
 }

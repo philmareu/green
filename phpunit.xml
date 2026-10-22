@@ -32,5 +32,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="PLAID_CLIENT_ID" value="test-client-id"/>
+        <env name="PLAID_SECRET" value="test-secret"/>
+        <env name="PLAID_ENV" value="sandbox"/>
+        <env name="PLAID_REDIRECT_URI" value=""/>
     </php>
 </phpunit>

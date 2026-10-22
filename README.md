@@ -1,58 +1,143 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Green
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**One place to see every Book you keep: business and personal, side by side.**
 
-## About Laravel
+Green is a self-hosted, open-source finance viewer for independent contractors and anyone else who runs more than one set of books. Organize bank accounts into **Books** (your LLC, your household, a side project), connect them through [Plaid](https://plaid.com), and see every balance and transaction in a single interface. No switching workspaces.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+It shows the two numbers your bank app makes you log in for:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Available balance.** What you can actually spend, after pending activity.
+- **Pending transactions.** Card swipes and transfers that haven't posted yet, across every Book.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Built with [Laravel](https://laravel.com) and [Filament](https://filamentphp.com).
 
-## Learning Laravel
+![Dashboard](docs/screenshots/dashboard.png)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+| Book view | Transactions |
+|---|---|
+| ![A Book with its accounts](docs/screenshots/book.png) | ![Transactions across every Book](docs/screenshots/transactions.png) |
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Features
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+- **Books** group accounts however you think about your money. A single bank login can feed several Books, so a business and a personal account at the same bank can live where they belong.
+- **Plaid Link** to connect thousands of banks. Green never sees your bank password.
+- **Incremental sync** with Plaid's `/transactions/sync`. Pending transactions are replaced cleanly when they post, so nothing is counted twice.
+- **Dashboard** with cash available and credit owed per Book, plus every pending transaction in one table.
+- **Connection health.** Banks that need you to sign in again are flagged, with a one-click reconnect.
+- **Live balance** on demand, straight from the bank.
+- Light and dark mode, responsive layout, and Filament's search, filters and column toggles throughout.
 
-## Agentic Development
+## Requirements
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- PHP 8.3+ with `pdo_sqlite` (or MySQL / PostgreSQL), `intl`, `bcmath` and `zip`
+- Composer 2
+- A Plaid account. [Sandbox keys are free](https://dashboard.plaid.com/signup).
+
+Node is not required to run Green.
+
+## Install
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git clone https://github.com/philmareu/green.git
+cd green
+composer setup            # install dependencies, create .env, app key and SQLite database
+php artisan green:install # run migrations and create your login
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Add your Plaid keys to `.env` (see below), then start the app:
 
-## Contributing
+```bash
+php artisan serve
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Open the URL it prints and sign in. Create a Book, then choose **Link bank account**.
 
-## Code of Conduct
+### Try it without Plaid
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Load sample Books, accounts and transactions:
 
-## Security Vulnerabilities
+```bash
+php artisan db:seed --class=DemoSeeder   # sign in as test@example.com / password
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Connecting Plaid
+
+1. Sign up at [dashboard.plaid.com](https://dashboard.plaid.com/signup) and copy your **client ID** and **Sandbox secret** from the Keys page of the dashboard.
+2. Add them to `.env`:
+
+   ```dotenv
+   PLAID_CLIENT_ID=your-client-id
+   PLAID_SECRET=your-sandbox-secret
+   PLAID_ENV=sandbox
+   ```
+
+3. In the Sandbox, any test bank works with username `user_good` and password `pass_good`. For realistic, changing data with pending transactions, use username `user_transactions_dynamic` with password `pass_good`.
+
+You can also link a Sandbox bank from the command line, without the browser flow:
+
+```bash
+php artisan plaid:sandbox-link 1   # 1 = the Book's id
+```
+
+### Going to production
+
+Set `PLAID_ENV=production` and use your production secret. Two things change:
+
+- **Serve Green over HTTPS.** Plaid requires it in production, and you are storing bank access tokens.
+- **OAuth banks** (Chase, Capital One, Wells Fargo and others) send users back to a registered redirect URL. Set `PLAID_REDIRECT_URI=https://your-domain/plaid/oauth` and add the same URL to the allowed redirect URIs in the Plaid dashboard.
+
+New Plaid teams can use a free Trial plan for a limited number of real bank connections. Check [Plaid's pricing](https://plaid.com/pricing/) for current limits. **Live balance** calls `/accounts/balance/get`, which Plaid bills per call in production. Everything else Green does uses Transactions.
+
+## Keeping data fresh
+
+`php artisan plaid:sync` queues a sync for every connected bank, and the scheduler runs it hourly. Run the scheduler in production with a cron entry:
+
+```cron
+* * * * * cd /path/to/green && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Locally, `php artisan schedule:work` does the same in the foreground.
+
+`.env.example` sets `QUEUE_CONNECTION=sync`, so syncs run immediately and no queue worker is needed. If you switch to the `database` or `redis` queue, also run `php artisan queue:work`.
+
+You can always press **Sync now** on a Book, account or bank connection.
+
+## Security
+
+- Plaid access tokens are encrypted at rest with your `APP_KEY`. **Back up `.env`.** If you rotate `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` or every bank connection will need to be linked again.
+- Green has no public registration. Create logins with `php artisan make:filament-user`.
+- Each user only sees their own Books, accounts and connections.
+
+Please report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
+
+## Development
+
+```bash
+composer test          # Pest test suite; every Plaid call is faked, no keys needed
+vendor/bin/pint        # code style
+```
+
+The interesting code lives in a few places:
+
+| Path | What it does |
+|---|---|
+| `app/Services/Plaid/PlaidClient.php` | Thin HTTP client for the Plaid endpoints Green uses. Plaid has no official PHP SDK. |
+| `app/Services/Plaid/SyncPlaidItem.php` | Cursor-based `/transactions/sync`, including pending → posted handling and safe retries. |
+| `app/Filament/Pages/LinkBank.php` | Plaid Link in the browser, including update mode and OAuth return. |
+| `app/Filament/Resources` | Books, Accounts, Transactions and Bank connections screens. |
+
+Amounts are stored exactly as Plaid sends them: positive means money left the account. Use `Transaction::signed_amount` for display.
+
+## Roadmap
+
+- Plaid webhooks for near-instant updates
+- Warn when the same bank is linked twice
+- Categories, rules and notes
+- Reports: income and spending per Book, tax-time exports
+- Manual accounts for banks Plaid doesn't support
+
+Ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Green is open-source software licensed under the [MIT license](LICENSE).
