@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Books\RelationManagers;
 
+use App\Filament\Actions\PlaidActions;
 use App\Filament\Resources\Accounts\Schemas\AccountForm;
 use App\Filament\Resources\Accounts\Tables\AccountsTable;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -13,6 +14,9 @@ class AccountsRelationManager extends RelationManager
     protected static string $relationship = 'accounts';
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    /** @var array<string, string> */
+    protected $listeners = [PlaidActions::SYNCED_EVENT => '$refresh'];
 
     public function isReadOnly(): bool
     {

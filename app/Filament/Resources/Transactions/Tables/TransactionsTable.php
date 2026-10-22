@@ -16,11 +16,11 @@ use Illuminate\Support\Str;
 
 class TransactionsTable
 {
-    public static function configure(Table $table, bool $withinBook = false): Table
+    public static function configure(Table $table, bool $withinBook = false, bool $withinAccount = false): Table
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['account.book', 'account.plaidItem']))
-            ->columns(static::columns($withinBook))
+            ->columns(static::columns($withinBook, $withinAccount))
             ->defaultSort(fn (Builder $query) => $query
                 ->orderByDesc($query->qualifyColumn('pending'))
                 ->orderByDesc($query->qualifyColumn('date'))
@@ -31,13 +31,14 @@ class TransactionsTable
                     ->query(fn (Builder $query, array $data) => filled($data['value'] ?? null)
                         ? $query->whereHas('account', fn (Builder $account) => $account->where('book_id', $data['value']))
                         : $query)
-                    ->visible(! $withinBook),
+                    ->visible(! ($withinBook || $withinAccount)),
                 SelectFilter::make('account_id')
                     ->label('Account')
                     ->options(fn (): array => Account::query()->ownedBy(auth()->user())->orderBy('name')->get()
                         ->mapWithKeys(fn (Account $account) => [$account->getKey() => $account->display_name])
                         ->all())
-                    ->searchable(),
+                    ->searchable()
+                    ->visible(! $withinAccount),
                 TernaryFilter::make('pending')
                     ->placeholder('Pending and posted')
                     ->trueLabel('Pending only')
@@ -66,7 +67,7 @@ class TransactionsTable
     /**
      * @return array<TextColumn>
      */
-    public static function columns(bool $withinBook = false): array
+    public static function columns(bool $withinBook = false, bool $withinAccount = false): array
     {
         return [
             TextColumn::make('date')
@@ -93,11 +94,12 @@ class TransactionsTable
                 ->badge()
                 ->color(fn (Transaction $record) => $record->account?->book?->kind?->getColor() ?? 'gray')
                 ->placeholder('Unassigned')
-                ->visible(! $withinBook),
+                ->visible(! ($withinBook || $withinAccount)),
             TextColumn::make('account.name')
                 ->label('Account')
                 ->formatStateUsing(fn (Transaction $record): string => $record->account->display_name)
-                ->toggleable(),
+                ->toggleable()
+                ->visible(! $withinAccount),
             TextColumn::make('amount')
                 ->state(fn (Transaction $record): float => $record->signed_amount)
                 ->money(fn (Transaction $record): string => $record->currency)

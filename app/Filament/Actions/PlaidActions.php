@@ -15,6 +15,7 @@ use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Livewire\Component;
 
 /**
  * Actions shared by several screens. Each one accepts a Plaid item, an
@@ -22,13 +23,18 @@ use Illuminate\Support\Collection;
  */
 class PlaidActions
 {
+    /**
+     * Dispatched after a sync or balance refresh so tables elsewhere on the page re-render.
+     */
+    public const SYNCED_EVENT = 'plaid-synced';
+
     public static function sync(): Action
     {
         return Action::make('sync')
             ->label('Sync now')
             ->icon(Heroicon::OutlinedArrowPath)
             ->color('gray')
-            ->action(function (Model $record, SyncPlaidItem $sync): void {
+            ->action(function (Model $record, SyncPlaidItem $sync, Component $livewire): void {
                 $items = static::itemsFor($record);
 
                 if ($items->isEmpty()) {
@@ -46,6 +52,9 @@ class PlaidActions
                         ->status($result->successful ? 'success' : 'danger')
                         ->send();
                 }
+
+                $record->refresh();
+                $livewire->dispatch(static::SYNCED_EVENT);
             });
     }
 
@@ -59,7 +68,7 @@ class PlaidActions
             ->icon(Heroicon::OutlinedBolt)
             ->color('gray')
             ->tooltip('Fetch the balance straight from the bank. Plaid bills this per call in production.')
-            ->action(function (Account $record, RefreshLiveBalances $refresh): void {
+            ->action(function (Account $record, RefreshLiveBalances $refresh, Component $livewire): void {
                 try {
                     $refresh->handle($record->plaidItem, [$record->plaid_account_id]);
                 } catch (PlaidException $e) {
@@ -67,6 +76,9 @@ class PlaidActions
 
                     return;
                 }
+
+                $record->refresh();
+                $livewire->dispatch(static::SYNCED_EVENT);
 
                 Notification::make()->title('Balance updated')->success()->send();
             });

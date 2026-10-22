@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Accounts\Tables;
 
 use App\Filament\Actions\PlaidActions;
+use App\Filament\Resources\Accounts\AccountResource;
 use App\Models\Account;
 use App\Models\Book;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -40,9 +42,17 @@ class AccountsTable
                     ->default(false),
             ])
             ->recordActions([
-                PlaidActions::reconnect(),
+                PlaidActions::reconnect()
+                    ->iconButton()
+                    ->tooltip('Reconnect bank'),
+                ViewAction::make()
+                    ->url(fn (Account $record): string => AccountResource::getUrl('view', ['record' => $record]))
+                    ->iconButton()
+                    ->tooltip('View'),
+                EditAction::make()
+                    ->iconButton()
+                    ->tooltip('Edit'),
                 ActionGroup::make([
-                    EditAction::make(),
                     PlaidActions::sync(),
                     PlaidActions::refreshLiveBalance(),
                 ]),
@@ -62,7 +72,8 @@ class AccountsTable
                 ->description(fn (Account $record): ?string => $record->plaidItem?->institution_name)
                 ->searchable()
                 ->sortable()
-                ->weight('medium'),
+                ->weight('medium')
+                ->wrap(),
             TextColumn::make('book.name')
                 ->label('Book')
                 ->badge()
@@ -93,13 +104,10 @@ class AccountsTable
             TextColumn::make('plaidItem.status')
                 ->label('Connection')
                 ->badge()
+                ->description(fn (Account $record): string => $record->plaidItem?->last_synced_at
+                    ? 'Synced '.$record->plaidItem->last_synced_at->diffForHumans()
+                    : 'Never synced')
                 ->tooltip(fn (Account $record): ?string => $record->plaidItem?->error_message),
-            TextColumn::make('plaidItem.last_synced_at')
-                ->label('Last synced')
-                ->since()
-                ->dateTimeTooltip()
-                ->placeholder('Never')
-                ->toggleable(),
         ];
     }
 }
