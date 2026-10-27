@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Models\User;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -11,6 +12,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -52,6 +54,22 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ]);
+            ])
+            ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): string => $this->loginLinks());
+    }
+
+    /**
+     * One-click "Log in as" buttons for local development, when
+     * LOGIN_LINK_ENABLED is on (spatie/laravel-login-link, a dev dependency).
+     */
+    protected function loginLinks(): string
+    {
+        if (! app()->environment(config('login-link.allowed_environments', []))) {
+            return '';
+        }
+
+        return view('filament.auth.login-links', [
+            'users' => User::query()->orderBy('id')->get(),
+        ])->render();
     }
 }

@@ -24,6 +24,7 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - `vendor/bin/pint` before committing.
 - `php artisan plaid:sync [--item=]` (scheduled hourly), `php artisan plaid:sandbox-link {book}`, `php artisan green:install`.
 - `php artisan db:seed --class=DemoSeeder` loads sample data (login `test@example.com` / `password`).
+- `LOGIN_LINK_ENABLED=true` in a local `.env` adds a "Log in as" button per user to the login page (`spatie/laravel-login-link`, a dev dependency; `config/login-link.php`, render hook in `AdminPanelProvider`). It needs `APP_ENV=local` too, and stays off by default because a server installed from `.env.example` also runs as `local`.
 
 ## Gotchas
 

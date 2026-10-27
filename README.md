@@ -62,6 +62,8 @@ Load sample Books, accounts and transactions:
 php artisan db:seed --class=DemoSeeder   # sign in as test@example.com / password
 ```
 
+Working on Green locally? Set `LOGIN_LINK_ENABLED=true` in `.env` and the sign-in page gets a **Log in as** button for each user. It only works while `APP_ENV=local`; never turn it on for a server other people can reach.
+
 ## Connecting Plaid
 
 1. Sign up at [dashboard.plaid.com](https://dashboard.plaid.com/signup) and copy your **client ID** and **Sandbox secret** from the Keys page of the dashboard.
@@ -83,7 +85,7 @@ php artisan plaid:sandbox-link 1   # 1 = the Book's id
 
 ### Going to production
 
-Set `PLAID_ENV=production` and use your production secret. Two things change:
+Set `APP_ENV=production` and `APP_DEBUG=false`, and set `PLAID_ENV=production` and use your production secret. Two things change:
 
 - **Serve Green over HTTPS.** Plaid requires it in production, and you are storing bank access tokens.
 - **OAuth banks** (Chase, Capital One, Wells Fargo and others) send users back to a registered redirect URL. Set `PLAID_REDIRECT_URI=https://your-domain/plaid/oauth` and add the same URL to the allowed redirect URIs in the Plaid dashboard.
