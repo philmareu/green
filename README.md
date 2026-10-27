@@ -27,6 +27,8 @@ Built with [Laravel](https://laravel.com) and [Filament](https://filamentphp.com
 - **Live balance** on demand, straight from the bank.
 - **Category sets** per Book, with one level of subcategories and income, expense or transfer types. Start from a Business set based on IRS Schedule C or a Personal set, then edit freely.
 - **Categorize from the transaction list.** Green suggests a category from Plaid's own category (you choose which Plaid categories feed each of yours), and anything you pick yourself is kept, even when a pending transaction posts.
+- **Recurring bills, flex spends and income.** Each bill shows the transaction that paid it and how it matched. Green links a payment only when its description contains the payee you set, so a matching amount alone never counts, and it allows for small price changes. Anything you unlink stays unlinked. Flex spends such as groceries or gas are weekly or monthly budgets used up by a category. Turn any transaction into a recurring item in one click.
+- **Forecast** an account's balance a few weeks out, starting from today's available balance, with a register and a chart. Add a one-time expense or expected payment and see what it does to the lowest point.
 - Light and dark mode, responsive layout, and Filament's search, filters and column toggles throughout.
 
 ## Requirements
@@ -85,7 +87,7 @@ php artisan plaid:sandbox-link 1   # 1 = the Book's id
 
 ### Going to production
 
-Set `APP_ENV=production` and `APP_DEBUG=false`, and set `PLAID_ENV=production` and use your production secret. Two things change:
+Set `APP_ENV=production` and `APP_DEBUG=false`, set `PLAID_ENV=production` and use your production secret, and set `APP_TIMEZONE` (e.g. `America/Chicago`) so due dates and the forecast follow your day. Two things change:
 
 - **Serve Green over HTTPS.** Plaid requires it in production, and you are storing bank access tokens.
 - **OAuth banks** (Chase, Capital One, Wells Fargo and others) send users back to a registered redirect URL. Set `PLAID_REDIRECT_URI=https://your-domain/plaid/oauth` and add the same URL to the allowed redirect URIs in the Plaid dashboard.

@@ -1,12 +1,14 @@
 <?php
 
 use App\Enums\CategorySource;
+use App\Enums\MatchSource;
 use App\Enums\PlaidItemStatus;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Category;
 use App\Models\CategorySet;
 use App\Models\PlaidItem;
+use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Services\Plaid\SyncPlaidItem;
 use Illuminate\Http\Client\Request;
@@ -272,4 +274,38 @@ it('keeps the category you picked when a pending transaction posts', function ()
         ->plaid_transaction_id->toBe('posted-1')
         ->category_id->toBe($meals->id)
         ->category_source->toBe(CategorySource::Manual);
+});
+
+it('links bills after a sync and keeps your link when the pending transaction posts', function () {
+    $this->travelTo('2026-10-21');
+    $starbucks = Recurring::factory()->for($this->account)->create(['payee' => 'starbucks', 'amount' => 12.50, 'starts_on' => '2026-10-19']);
+    fakeSyncPages(
+        syncPage(added: [plaidTransaction(['transaction_id' => 'pending-1', 'pending' => true])], nextCursor: 'c1'),
+        syncPage(added: [plaidTransaction(['transaction_id' => 'posted-1', 'pending_transaction_id' => 'pending-1'])], nextCursor: 'c2'),
+    );
+
+    sync($this->item);
+    $occurrence = $starbucks->occurrences()->whereNotNull('transaction_id')->sole();
+    $occurrence->update(['matched_by' => MatchSource::Manual]);
+    sync($this->item);
+
+    expect($occurrence->fresh())
+        ->transaction->plaid_transaction_id->toBe('posted-1')
+        ->matched_by->toBe(MatchSource::Manual);
+});
+
+it('does not link a transaction you unlinked once it posts', function () {
+    $this->travelTo('2026-10-21');
+    $starbucks = Recurring::factory()->for($this->account)->create(['payee' => 'starbucks', 'amount' => 12.50, 'starts_on' => '2026-10-19']);
+    fakeSyncPages(
+        syncPage(added: [plaidTransaction(['transaction_id' => 'pending-1', 'pending' => true])], nextCursor: 'c1'),
+        syncPage(added: [plaidTransaction(['transaction_id' => 'posted-1', 'pending_transaction_id' => 'pending-1'])], nextCursor: 'c2'),
+    );
+
+    sync($this->item);
+    $starbucks->occurrences()->whereNotNull('transaction_id')->sole()->unlink();
+    sync($this->item);
+
+    expect(Transaction::sole()->plaid_transaction_id)->toBe('posted-1')
+        ->and($starbucks->occurrences()->whereNotNull('transaction_id')->exists())->toBeFalse();
 });

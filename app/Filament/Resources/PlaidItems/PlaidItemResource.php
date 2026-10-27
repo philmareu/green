@@ -17,7 +17,7 @@ class PlaidItemResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedLink;
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $modelLabel = 'bank connection';
 

@@ -2,10 +2,14 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Frequency;
 use App\Enums\PlaidItemStatus;
+use App\Enums\RecurringKind;
 use App\Models\Account;
 use App\Models\Book;
+use App\Models\Category;
 use App\Models\PlaidItem;
+use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Categories\CategorizeTransactions;
@@ -21,7 +25,7 @@ use Illuminate\Support\Str;
  */
 class DemoSeeder extends Seeder
 {
-    /** @var array<string, list<array{0: string, 1: string, 2: float, 3: float}>> merchant, category, min, max */
+    /** @var array<string, list<array{0: string, 1: string, 2: float, 3: float, 4?: string}>> merchant, category, min, max, detailed category */
     private const array MERCHANTS = [
         'business' => [
             ['GitHub', 'GENERAL_SERVICES', 4, 21],
@@ -33,9 +37,9 @@ class DemoSeeder extends Seeder
             ['Staples', 'GENERAL_MERCHANDISE', 12, 90],
         ],
         'personal' => [
-            ['Whole Foods Market', 'FOOD_AND_DRINK', 24, 180],
+            ['Whole Foods Market', 'FOOD_AND_DRINK', 24, 180, 'FOOD_AND_DRINK_GROCERIES'],
             ['Starbucks', 'FOOD_AND_DRINK', 4, 12],
-            ['Shell', 'TRANSPORTATION', 30, 70],
+            ['Shell', 'TRANSPORTATION', 30, 70, 'TRANSPORTATION_GAS'],
             ['Comcast', 'RENT_AND_UTILITIES', 89, 89],
             ['Target', 'GENERAL_MERCHANDISE', 15, 140],
             ['Netflix', 'ENTERTAINMENT', 15.49, 15.49],
@@ -100,15 +104,51 @@ class DemoSeeder extends Seeder
             $this->income($businessChecking, 'Client payment: Invoice '.random_int(1000, 1099), 8500, $daysAgo);
         }
 
-        $this->income($personalChecking, 'Owner draw from Acme Consulting', 4000, 2, plaidCategory: 'TRANSFER_IN');
+        $this->income($personalChecking, 'Owner draw from Acme Consulting', 2000, 2, plaidCategory: 'TRANSFER_IN');
 
         app(CategorizeTransactions::class)->handle(Transaction::query()->ownedBy($user));
+
+        $this->recurring($user, $businessChecking, $personalChecking);
+    }
+
+    /**
+     * Bills, flex spends and income so the forecast has something to show.
+     */
+    private function recurring(User $user, Account $businessChecking, Account $personalChecking): void
+    {
+        $category = fn (string $name): ?int => Category::query()->ownedBy($user)->where('name', $name)->value('id');
+        $monthly = fn (int $dueInDays) => today()->addDays($dueInDays)->subMonths(3);
+
+        $items = [
+            [$personalChecking, RecurringKind::Bill, 'Rent', 1850, Frequency::Monthly, today()->addMonthNoOverflow()->startOfMonth(), []],
+            [$personalChecking, RecurringKind::Bill, 'Comcast', 89, Frequency::Monthly, $monthly(5), ['payee' => 'comcast']],
+            [$personalChecking, RecurringKind::Bill, 'Netflix', 15.49, Frequency::Monthly, $monthly(12), ['payee' => 'netflix']],
+            [$personalChecking, RecurringKind::Flex, 'Groceries', 150, Frequency::Weekly, today()->startOfWeek(), ['category_id' => $category('Groceries')]],
+            [$personalChecking, RecurringKind::Flex, 'Gas', 60, Frequency::Weekly, today()->startOfWeek(), ['category_id' => $category('Fuel')]],
+            [$personalChecking, RecurringKind::Income, 'Owner draw', 2000, Frequency::EveryTwoWeeks, today()->subDays(2), ['payee' => 'owner draw']],
+            [$personalChecking, RecurringKind::Bill, 'Car repair', 800, Frequency::Once, today()->addDays(9), []],
+            [$businessChecking, RecurringKind::Income, 'Client retainer', 8500, Frequency::Monthly, today()->subDays(33), ['payee' => 'client payment', 'amount_tolerance' => null]],
+        ];
+
+        foreach ($items as [$account, $kind, $name, $amount, $frequency, $startsOn, $attributes]) {
+            Recurring::query()->create([
+                'user_id' => $user->id,
+                'account_id' => $account->id,
+                'kind' => $kind,
+                'name' => $name,
+                'amount' => $amount,
+                'frequency' => $frequency,
+                'starts_on' => $startsOn,
+                'amount_tolerance' => $kind === RecurringKind::Flex ? null : 10,
+                ...$attributes,
+            ]);
+        }
     }
 
     private function spending(Account $account, string $kind, int $posted, int $pending): void
     {
         foreach (range(1, $posted + $pending) as $i) {
-            [$merchant, $category, $min, $max] = fake()->randomElement(self::MERCHANTS[$kind]);
+            [$merchant, $category, $min, $max, $detailed] = [...fake()->randomElement(self::MERCHANTS[$kind]), null];
             $isPending = $i <= $pending;
             $date = $isPending ? now()->subDays(random_int(0, 2)) : now()->subDays(random_int(3, 60));
 
@@ -120,7 +160,7 @@ class DemoSeeder extends Seeder
                 'date' => $date,
                 'authorized_date' => $date,
                 'category_primary' => $category,
-                'category_detailed' => null,
+                'category_detailed' => $detailed,
             ]);
         }
     }

@@ -51,6 +51,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(CategorySet::class);
     }
 
+    /** @return HasMany<Recurring, $this> */
+    public function recurrings(): HasMany
+    {
+        return $this->hasMany(Recurring::class);
+    }
+
     /**
      * Green is self-hosted: every user created on this install may sign in.
      */

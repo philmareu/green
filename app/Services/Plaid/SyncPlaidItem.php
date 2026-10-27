@@ -7,9 +7,12 @@ use App\Enums\PlaidItemStatus;
 use App\Models\PlaidItem;
 use App\Models\Transaction;
 use App\Services\Categories\CategorizeTransactions;
+use App\Services\Recurring\MatchRecurringTransactions;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Pulls incremental transaction updates for one Item with /transactions/sync.
@@ -28,6 +31,7 @@ class SyncPlaidItem
         private readonly PlaidClient $plaid,
         private readonly UpsertAccounts $upsertAccounts,
         private readonly CategorizeTransactions $categorize,
+        private readonly MatchRecurringTransactions $matchRecurring,
     ) {}
 
     public function handle(PlaidItem $item): SyncResult
@@ -77,6 +81,7 @@ class SyncPlaidItem
                 $added += $this->upsertTransactions($accountIds->all(), $page['added'] ?? []);
                 $modified += $this->upsertTransactions($accountIds->all(), $page['modified'] ?? []);
                 $this->keepCategoriesOfSettledPending($accountIds->values()->all(), $page['added'] ?? []);
+                $this->keepRecurringLinksOfSettledPending($accountIds->values()->all(), $page['added'] ?? []);
                 $removed += $this->deleteSettledPending($accountIds->values()->all(), $page['added'] ?? []);
                 $removed += $this->deleteTransactions(
                     $accountIds->values()->all(),
@@ -98,6 +103,13 @@ class SyncPlaidItem
             'error_code' => null,
             'error_message' => null,
         ])->save();
+
+        // After the cursor is saved, so a matching bug can't stop syncing.
+        try {
+            $this->matchRecurring->forAccounts($item->accounts()->pluck('id'));
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         return new SyncResult(true, $added, $modified, $removed);
     }
@@ -162,10 +174,7 @@ class SyncPlaidItem
      */
     protected function keepCategoriesOfSettledPending(array $accountIds, array $added): void
     {
-        $postedByPendingId = collect($added)
-            ->reject(fn (array $transaction) => $transaction['pending'] ?? false)
-            ->filter(fn (array $transaction) => filled($transaction['pending_transaction_id'] ?? null))
-            ->pluck('transaction_id', 'pending_transaction_id');
+        $postedByPendingId = $this->postedByPendingId($added);
 
         if ($postedByPendingId->isEmpty()) {
             return;
@@ -182,6 +191,55 @@ class SyncPlaidItem
                 ->where('plaid_transaction_id', $postedByPendingId[$pending->plaid_transaction_id])
                 ->where(fn ($query) => $query->whereNull('category_id')->orWhere('category_source', CategorySource::Suggested))
                 ->update(['category_id' => $pending->category_id, 'category_source' => CategorySource::Manual]));
+    }
+
+    /**
+     * Move a bill's link from a pending transaction to the posted one that
+     * replaces it, so a link you made by hand isn't lost.
+     *
+     * @param  list<int>  $accountIds
+     * @param  list<array<string, mixed>>  $added
+     */
+    protected function keepRecurringLinksOfSettledPending(array $accountIds, array $added): void
+    {
+        $postedByPendingId = $this->postedByPendingId($added);
+
+        if ($postedByPendingId->isEmpty()) {
+            return;
+        }
+
+        Transaction::query()
+            ->whereIn('account_id', $accountIds)
+            ->whereIn('plaid_transaction_id', $postedByPendingId->keys())
+            ->where('pending', true)
+            ->with('occurrence')
+            ->has('occurrence')
+            ->get()
+            ->each(function (Transaction $pending) use ($accountIds, $postedByPendingId): void {
+                $posted = Transaction::query()
+                    ->whereIn('account_id', $accountIds)
+                    ->where('plaid_transaction_id', $postedByPendingId[$pending->plaid_transaction_id])
+                    ->doesntHave('occurrence')
+                    ->first();
+
+                if ($posted !== null) {
+                    $pending->occurrence->update(['transaction_id' => $posted->id]);
+                }
+            });
+    }
+
+    /**
+     * Posted transactions in a page that replace a pending one.
+     *
+     * @param  list<array<string, mixed>>  $added
+     * @return Collection<string, string> pending Plaid id => posted Plaid id
+     */
+    protected function postedByPendingId(array $added): Collection
+    {
+        return collect($added)
+            ->reject(fn (array $transaction) => $transaction['pending'] ?? false)
+            ->filter(fn (array $transaction) => filled($transaction['pending_transaction_id'] ?? null))
+            ->pluck('transaction_id', 'pending_transaction_id');
     }
 
     /**
