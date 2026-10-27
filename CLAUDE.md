@@ -8,6 +8,7 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - `PlaidItem` = one bank login, owned by a **User**, not a Book. Its accounts can sit in different Books; `accounts.book_id` is nullable ("Unassigned").
 - `transactions.amount` keeps **Plaid's sign: positive = money out**. Display with `Transaction::signed_amount`. Never flip it in storage.
 - `CategorySet` (owned by a User, kind business/personal) → `Category`. Each Book picks one set (`books.category_set_id`, nullable); sets can be shared. Categories nest one level (`parent_id`), and a subcategory always takes its parent's `type` (income/expense/transfer), enforced in `Category::booted()`. Starter lists live in `app/Services/Categories/StarterCategories.php` (business = IRS Schedule C lines). Plaid's own category is kept separately on `transactions.category_primary`/`category_detailed`.
+- `transactions.category_id` must be a category in the transaction's Book's set. `category_source` is `suggested` (from Plaid's category via `categories.plaid_categories`; may change) or `manual` (never replaced unless it leaves the Book's set). `app/Services/Categories/CategorizeTransactions.php` enforces both; it runs after each sync, when an account changes Book, when a Book changes set or is deleted, and after category edits. Green requests Plaid's PFC v2 codes (`app/Services/Categories/PlaidCategories.php`).
 - Every user-reachable query is scoped with the `ownedBy($user)` model scopes (Books, Items and CategorySets by `user_id`; Accounts and Transactions through `plaidItem.user_id`; Categories through `categorySet.user_id`). Filament resources apply it in `getEloquentQuery()`.
 
 ## Plaid
@@ -27,6 +28,7 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 ## Gotchas
 
 - No custom Filament theme: Tailwind utility classes in custom Blade views are not compiled. Use Filament Blade components or inline styles, or add a theme with `make:filament-theme`.
+- Tests run on SQLite; check foreign key changes against MySQL too (MySQL refuses a self-referencing `nullOnDelete` inside a cascade).
 - Book relation managers query transactions through a join with `accounts`; qualify column names (`$query->qualifyColumn()`) in custom sorts, filters and searches.
 
 <laravel-boost-guidelines>

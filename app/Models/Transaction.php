@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CategorySource;
 use Database\Factories\TransactionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -27,6 +28,8 @@ use Illuminate\Support\Carbon;
     'name',
     'merchant_name',
     'pending',
+    'category_id',
+    'category_source',
     'category_primary',
     'category_detailed',
     'payment_channel',
@@ -44,6 +47,7 @@ class Transaction extends Model
             'date' => 'date',
             'authorized_date' => 'date',
             'pending' => 'boolean',
+            'category_source' => CategorySource::class,
             'raw' => 'array',
         ];
     }
@@ -52,6 +56,12 @@ class Transaction extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /** @return BelongsTo<Category, $this> */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
     }
 
     public function isInflow(): bool

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BookKind;
+use App\Enums\CategoryType;
 use Database\Factories\CategorySetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -45,6 +46,26 @@ class CategorySet extends Model
     public function books(): HasMany
     {
         return $this->hasMany(Book::class);
+    }
+
+    /**
+     * Options for picking one of this set's categories, grouped by type, each
+     * parent followed by its subcategories.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function categoryOptions(): array
+    {
+        return $this->categories()->with('parent')->get()
+            ->sortBy(fn (Category $category): string => implode("\0", [
+                array_search($category->type, CategoryType::cases(), strict: true),
+                mb_strtolower($category->parent?->name ?? $category->name),
+                $category->parent_id === null ? 0 : 1,
+                mb_strtolower($category->name),
+            ]))
+            ->groupBy(fn (Category $category): string => $category->type->getLabel())
+            ->map(fn ($categories): array => $categories->mapWithKeys(fn (Category $category): array => [$category->getKey() => $category->full_name])->all())
+            ->all();
     }
 
     #[Scope]

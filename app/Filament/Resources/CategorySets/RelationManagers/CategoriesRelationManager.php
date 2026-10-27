@@ -4,6 +4,8 @@ namespace App\Filament\Resources\CategorySets\RelationManagers;
 
 use App\Enums\CategoryType;
 use App\Models\Category;
+use App\Services\Categories\CategorizeTransactions;
+use App\Services\Categories\PlaidCategories;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -61,6 +63,13 @@ class CategoriesRelationManager extends RelationManager
                     ->inline()
                     ->required()
                     ->hidden(fn (Get $get): bool => $get->filled('parent_id')),
+                Select::make('plaid_categories')
+                    ->label('Suggest for Plaid categories')
+                    ->multiple()
+                    ->options(PlaidCategories::options())
+                    ->searchable()
+                    ->helperText('Transactions Plaid files under these get this category as a suggestion. A specific Plaid category wins over an "Any" one.')
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -73,6 +82,15 @@ class CategoriesRelationManager extends RelationManager
                     ->formatStateUsing(fn (Category $record): string => $record->parent_id ? "↳ {$record->name}" : $record->name)
                     ->weight(fn (Category $record): ?string => $record->parent_id ? null : 'medium')
                     ->searchable(),
+                TextColumn::make('plaid_categories')
+                    ->label('Suggested for')
+                    ->formatStateUsing(fn (string $state): string => PlaidCategories::label($state))
+                    ->badge()
+                    ->color('gray')
+                    ->limitList(3)
+                    ->expandableLimitedList()
+                    ->wrap()
+                    ->toggleable(),
             ])
             ->defaultGroup(Group::make('type')
                 ->titlePrefixedWithLabel(false)
@@ -88,16 +106,28 @@ class CategoriesRelationManager extends RelationManager
                 ->orderBy('categories.name'))
             ->paginated(false)
             ->headerActions([
-                CreateAction::make()->label('New category'),
+                CreateAction::make()
+                    ->label('New category')
+                    ->after($this->recategorize(...)),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->after($this->recategorize(...)),
                 DeleteAction::make()
                     ->modalDescription(fn (Category $record): ?string => $record->children()->exists()
                         ? 'Its subcategories move to the top level.'
-                        : null),
+                        : null)
+                    ->after($this->recategorize(...)),
             ])
             ->emptyStateHeading('No categories yet')
             ->emptyStateDescription('Add the categories this set offers its Books.');
+    }
+
+    /**
+     * Refresh suggestions for the set's transactions after its categories change.
+     */
+    protected function recategorize(CategorizeTransactions $categorize): void
+    {
+        $categorize->forCategorySet($this->getOwnerRecord());
     }
 }

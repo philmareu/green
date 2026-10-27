@@ -7,8 +7,11 @@ use App\Filament\Resources\CategorySets\Pages\EditCategorySet;
 use App\Filament\Resources\CategorySets\Pages\ListCategorySets;
 use App\Filament\Resources\CategorySets\Pages\ViewCategorySet;
 use App\Filament\Resources\CategorySets\RelationManagers\CategoriesRelationManager;
+use App\Models\Account;
+use App\Models\Book;
 use App\Models\Category;
 use App\Models\CategorySet;
+use App\Models\Transaction;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
@@ -67,6 +70,20 @@ it('hides other users’ category sets', function () {
 
     Livewire::test(ViewCategorySet::class, ['record' => $theirs->getRouteKey()])->assertNotFound();
     Livewire::test(EditCategorySet::class, ['record' => $theirs->getRouteKey()])->assertNotFound();
+});
+
+it('deletes a set with its categories and leaves its Books without one', function () {
+    $set = CategorySet::factory()->for($this->user)->create();
+    $parent = Category::factory()->for($set)->create();
+    Category::factory()->childOf($parent)->create();
+    $book = Book::factory()->for($this->user)->create(['category_set_id' => $set->id]);
+
+    Livewire::test(EditCategorySet::class, ['record' => $set->getRouteKey()])
+        ->callAction('delete');
+
+    expect(CategorySet::query()->whereKey($set->id)->exists())->toBeFalse()
+        ->and(Category::query()->count())->toBe(0)
+        ->and($book->fresh()->category_set_id)->toBeNull();
 });
 
 it('adds a subcategory with its parent’s type', function () {
@@ -134,4 +151,21 @@ it('moves subcategories to the top level when their parent is deleted', function
 
     expect($parent->fresh())->toBeNull()
         ->and($child->fresh()->parent_id)->toBeNull();
+});
+
+it('refreshes suggestions when a category’s Plaid categories change', function () {
+    $set = CategorySet::factory()->for($this->user)->create();
+    $coffee = Category::factory()->for($set)->create(['name' => 'Coffee']);
+    $book = Book::factory()->for($this->user)->create(['category_set_id' => $set->id]);
+    $latte = Transaction::factory()->for(Account::factory()->inBook($book))->create([
+        'category_primary' => 'FOOD_AND_DRINK',
+        'category_detailed' => 'FOOD_AND_DRINK_COFFEE',
+    ]);
+
+    manageCategories($set)
+        ->callAction(TestAction::make('edit')->table($coffee), data: ['plaid_categories' => ['FOOD_AND_DRINK_COFFEE']])
+        ->assertHasNoFormErrors();
+
+    expect($coffee->fresh()->plaid_categories)->toBe(['FOOD_AND_DRINK_COFFEE'])
+        ->and($latte->fresh()->category_id)->toBe($coffee->id);
 });

@@ -114,6 +114,8 @@ class PlaidClient
         $payload = [
             'access_token' => $accessToken,
             'count' => $count,
+            // Older Plaid accounts default to v1 categories; Green's suggestions use v2.
+            'options' => ['personal_finance_category_version' => 'v2'],
         ];
 
         if (filled($cursor)) {

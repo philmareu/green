@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\BookKind;
+use App\Services\Categories\CategorizeTransactions;
 use Database\Factories\BookFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -19,6 +20,21 @@ class Book extends Model
 {
     /** @use HasFactory<BookFactory> */
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        static::updated(function (Book $book): void {
+            if ($book->wasChanged('category_set_id')) {
+                app(CategorizeTransactions::class)->handle(Transaction::query()->whereIn('account_id', $book->accounts()->select('id')));
+            }
+        });
+
+        // Unassign accounts one by one (rather than through the foreign key) so
+        // their transactions drop this Book's categories.
+        static::deleting(function (Book $book): void {
+            $book->accounts->each->update(['book_id' => null]);
+        });
+    }
 
     protected function casts(): array
     {

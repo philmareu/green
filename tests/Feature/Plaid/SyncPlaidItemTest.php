@@ -1,8 +1,11 @@
 <?php
 
+use App\Enums\CategorySource;
 use App\Enums\PlaidItemStatus;
 use App\Models\Account;
 use App\Models\Book;
+use App\Models\Category;
+use App\Models\CategorySet;
 use App\Models\PlaidItem;
 use App\Models\Transaction;
 use App\Services\Plaid\SyncPlaidItem;
@@ -238,4 +241,35 @@ it('authenticates sync requests with the item’s access token', function () {
     sync($this->item);
 
     Http::assertSent(fn (Request $request) => $request['access_token'] === $this->item->access_token);
+});
+
+it('suggests categories for synced transactions', function () {
+    $set = CategorySet::factory()->for($this->book->user)->create();
+    $coffee = Category::factory()->for($set)->create(['plaid_categories' => ['FOOD_AND_DRINK_COFFEE']]);
+    $this->book->update(['category_set_id' => $set->id]);
+    fakeSyncPages(syncPage(added: [plaidTransaction()]));
+
+    sync($this->item);
+
+    expect(Transaction::sole())->category_id->toBe($coffee->id)->category_source->toBe(CategorySource::Suggested);
+});
+
+it('keeps the category you picked when a pending transaction posts', function () {
+    $set = CategorySet::factory()->for($this->book->user)->create();
+    Category::factory()->for($set)->create(['plaid_categories' => ['FOOD_AND_DRINK_COFFEE']]);
+    $meals = Category::factory()->for($set)->create();
+    $this->book->update(['category_set_id' => $set->id]);
+    fakeSyncPages(
+        syncPage(added: [plaidTransaction(['transaction_id' => 'pending-1', 'pending' => true])], nextCursor: 'c1'),
+        syncPage(added: [plaidTransaction(['transaction_id' => 'posted-1', 'pending_transaction_id' => 'pending-1'])], nextCursor: 'c2'),
+    );
+
+    sync($this->item);
+    Transaction::sole()->update(['category_id' => $meals->id, 'category_source' => CategorySource::Manual]);
+    sync($this->item);
+
+    expect(Transaction::sole())
+        ->plaid_transaction_id->toBe('posted-1')
+        ->category_id->toBe($meals->id)
+        ->category_source->toBe(CategorySource::Manual);
 });

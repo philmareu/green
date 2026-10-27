@@ -2,10 +2,15 @@
 
 namespace App\Filament\Resources\Transactions\Tables;
 
+use App\Enums\CategorySource;
 use App\Models\Account;
 use App\Models\Book;
+use App\Models\Category;
+use App\Models\CategorySet;
 use App\Models\Transaction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Columns\Column;
+use Filament\Tables\Columns\SelectColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -19,7 +24,7 @@ class TransactionsTable
     public static function configure(Table $table, bool $withinBook = false, bool $withinAccount = false): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query) => $query->with(['account.book', 'account.plaidItem']))
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['account.book.categorySet', 'account.plaidItem']))
             ->columns(static::columns($withinBook, $withinAccount))
             ->defaultSort(fn (Builder $query) => $query
                 ->orderByDesc($query->qualifyColumn('pending'))
@@ -39,6 +44,21 @@ class TransactionsTable
                         ->all())
                     ->searchable()
                     ->visible(! $withinAccount),
+                SelectFilter::make('category')
+                    ->options(fn (): array => ['uncategorized' => 'Uncategorized']
+                        + CategorySet::query()->ownedBy(auth()->user())->orderBy('name')->get()
+                            ->mapWithKeys(fn (CategorySet $set): array => [$set->name => collect($set->categoryOptions())->collapseWithKeys()->all()])
+                            ->all())
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        null, '' => $query,
+                        'uncategorized' => $query->whereNull($query->qualifyColumn('category_id')),
+                        // A parent category also matches its subcategories.
+                        default => $query->whereIn($query->qualifyColumn('category_id'), Category::query()
+                            ->ownedBy(auth()->user())
+                            ->where(fn (Builder $category) => $category->whereKey($data['value'])->orWhere('parent_id', $data['value']))
+                            ->select('id')),
+                    })
+                    ->searchable(),
                 TernaryFilter::make('pending')
                     ->placeholder('Pending and posted')
                     ->trueLabel('Pending only')
@@ -65,7 +85,7 @@ class TransactionsTable
     }
 
     /**
-     * @return array<TextColumn>
+     * @return array<Column>
      */
     public static function columns(bool $withinBook = false, bool $withinAccount = false): array
     {
@@ -84,6 +104,7 @@ class TransactionsTable
                     ->where($query->qualifyColumn('name'), 'like', "%{$search}%")
                     ->orWhere($query->qualifyColumn('merchant_name'), 'like', "%{$search}%")))
                 ->wrap(),
+            static::categoryColumn(),
             TextColumn::make('pending')
                 ->label('Status')
                 ->badge()
@@ -107,5 +128,38 @@ class TransactionsTable
                 ->weight('medium')
                 ->alignEnd(),
         ];
+    }
+
+    /**
+     * Pick a category from the transaction's Book's set. Suggested categories
+     * are shown in italics until you pick one yourself.
+     */
+    public static function categoryColumn(): SelectColumn
+    {
+        /** @var array<int, array<int, string>> $optionsBySet */
+        $optionsBySet = [];
+
+        return SelectColumn::make('category_id')
+            ->label('Category')
+            ->options(function (Transaction $record) use (&$optionsBySet): array {
+                $set = $record->account?->book?->categorySet;
+
+                // Native selects can't show option groups, so list them in order instead.
+                return $set === null ? [] : ($optionsBySet[$set->getKey()] ??= collect($set->categoryOptions())->collapseWithKeys()->all());
+            })
+            ->placeholder(fn (Transaction $record): string => $record->account?->book?->categorySet ? 'Uncategorized' : 'No category set')
+            ->disabled(fn (Transaction $record): bool => $record->account?->book?->categorySet === null)
+            ->extraInputAttributes(fn (Transaction $record): array => [
+                'title' => $record->category_source?->getLabel(),
+                'style' => 'min-width: 12rem;'.($record->category_source === CategorySource::Suggested ? ' font-style: italic;' : ''),
+            ])
+            ->updateStateUsing(function (Transaction $record, ?string $state): ?string {
+                $record->update([
+                    'category_id' => filled($state) ? (int) $state : null,
+                    'category_source' => filled($state) ? CategorySource::Manual : null,
+                ]);
+
+                return $state;
+            });
     }
 }

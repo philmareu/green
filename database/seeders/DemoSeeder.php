@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\PlaidItem;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Services\Categories\CategorizeTransactions;
 use App\Services\Categories\StarterCategories;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -99,7 +100,9 @@ class DemoSeeder extends Seeder
             $this->income($businessChecking, 'Client payment: Invoice '.random_int(1000, 1099), 8500, $daysAgo);
         }
 
-        $this->income($personalChecking, 'Owner draw from Acme Consulting', 4000, 2);
+        $this->income($personalChecking, 'Owner draw from Acme Consulting', 4000, 2, plaidCategory: 'TRANSFER_IN');
+
+        app(CategorizeTransactions::class)->handle(Transaction::query()->ownedBy($user));
     }
 
     private function spending(Account $account, string $kind, int $posted, int $pending): void
@@ -122,7 +125,7 @@ class DemoSeeder extends Seeder
         }
     }
 
-    private function income(Account $account, string $name, float $amount, int $daysAgo): void
+    private function income(Account $account, string $name, float $amount, int $daysAgo, string $plaidCategory = 'INCOME'): void
     {
         Transaction::factory()->for($account)->create([
             'name' => $name,
@@ -130,7 +133,7 @@ class DemoSeeder extends Seeder
             'amount' => -$amount,
             'date' => now()->subDays($daysAgo),
             'authorized_date' => now()->subDays($daysAgo),
-            'category_primary' => 'INCOME',
+            'category_primary' => $plaidCategory,
             'category_detailed' => null,
             'payment_channel' => 'other',
         ]);

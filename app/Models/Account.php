@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Categories\CategorizeTransactions;
 use Database\Factories\AccountFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -32,6 +33,16 @@ class Account extends Model
 {
     /** @use HasFactory<AccountFactory> */
     use HasFactory;
+
+    protected static function booted(): void
+    {
+        // A different Book can mean a different category set.
+        static::updated(function (Account $account): void {
+            if ($account->wasChanged('book_id')) {
+                app(CategorizeTransactions::class)->handle($account->transactions()->getQuery());
+            }
+        });
+    }
 
     protected function casts(): array
     {

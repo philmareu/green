@@ -63,7 +63,8 @@ it('only sends a cursor when there is one', function () {
     $requests = Http::recorded()->map(fn ($pair) => $pair[0]);
     expect(isset($requests[0]['cursor']))->toBeFalse()
         ->and($requests[1]['cursor'])->toBe('cursor-abc')
-        ->and($requests[1]['count'])->toBe(500);
+        ->and($requests[1]['count'])->toBe(500)
+        ->and($requests[1]['options']['personal_finance_category_version'])->toBe('v2');
 });
 
 it('turns Plaid error responses into exceptions', function () {

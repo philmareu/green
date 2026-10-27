@@ -26,6 +26,7 @@ Built with [Laravel](https://laravel.com) and [Filament](https://filamentphp.com
 - **Connection health.** Banks that need you to sign in again are flagged, with a one-click reconnect.
 - **Live balance** on demand, straight from the bank.
 - **Category sets** per Book, with one level of subcategories and income, expense or transfer types. Start from a Business set based on IRS Schedule C or a Personal set, then edit freely.
+- **Categorize from the transaction list.** Green suggests a category from Plaid's own category (you choose which Plaid categories feed each of yours), and anything you pick yourself is kept, even when a pending transaction posts.
 - Light and dark mode, responsive layout, and Filament's search, filters and column toggles throughout.
 
 ## Requirements
@@ -133,7 +134,7 @@ Amounts are stored exactly as Plaid sends them: positive means money left the ac
 
 - Plaid webhooks for near-instant updates
 - Warn when the same bank is linked twice
-- Categorize transactions, with rules and suggestions from Plaid's categories
+- Rules (e.g. by merchant) and bulk categorizing
 - Notes on transactions
 - Reports: income and spending per Book, tax-time exports
 - Manual accounts for banks Plaid doesn't support

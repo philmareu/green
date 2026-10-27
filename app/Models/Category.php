@@ -16,8 +16,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * A category in a set. Categories nest one level deep ("Travel and meals ›
  * Meals"), and a subcategory always has its parent's type so totals roll up.
+ * `plaid_categories` lists the Plaid categories (primary or detailed codes)
+ * whose transactions are suggested for this category.
  */
-#[Fillable(['category_set_id', 'parent_id', 'name', 'type'])]
+#[Fillable(['category_set_id', 'parent_id', 'name', 'type', 'plaid_categories'])]
 class Category extends Model
 {
     /** @use HasFactory<CategoryFactory> */
@@ -36,12 +38,18 @@ class Category extends Model
                 $category->children()->update(['type' => $category->type]);
             }
         });
+
+        // Deleting a category keeps its subcategories, at the top level.
+        static::deleting(function (Category $category): void {
+            $category->children()->update(['parent_id' => null]);
+        });
     }
 
     protected function casts(): array
     {
         return [
             'type' => CategoryType::class,
+            'plaid_categories' => 'array',
         ];
     }
 

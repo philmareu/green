@@ -21,7 +21,7 @@ class PendingTransactions extends TableWidget
             ->query(fn () => Transaction::query()
                 ->ownedBy(auth()->user())
                 ->onlyPending()
-                ->with(['account.book', 'account.plaidItem'])
+                ->with(['account.book.categorySet', 'account.plaidItem'])
                 ->latest('date'))
             ->columns(collect(TransactionsTable::columns())
                 ->reject(fn ($column) => $column->getName() === 'pending')

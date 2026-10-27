@@ -2,9 +2,11 @@
 
 namespace App\Services\Plaid;
 
+use App\Enums\CategorySource;
 use App\Enums\PlaidItemStatus;
 use App\Models\PlaidItem;
 use App\Models\Transaction;
+use App\Services\Categories\CategorizeTransactions;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +27,7 @@ class SyncPlaidItem
     public function __construct(
         private readonly PlaidClient $plaid,
         private readonly UpsertAccounts $upsertAccounts,
+        private readonly CategorizeTransactions $categorize,
     ) {}
 
     public function handle(PlaidItem $item): SyncResult
@@ -73,6 +76,7 @@ class SyncPlaidItem
 
                 $added += $this->upsertTransactions($accountIds->all(), $page['added'] ?? []);
                 $modified += $this->upsertTransactions($accountIds->all(), $page['modified'] ?? []);
+                $this->keepCategoriesOfSettledPending($accountIds->values()->all(), $page['added'] ?? []);
                 $removed += $this->deleteSettledPending($accountIds->values()->all(), $page['added'] ?? []);
                 $removed += $this->deleteTransactions(
                     $accountIds->values()->all(),
@@ -83,6 +87,8 @@ class SyncPlaidItem
             $cursor = $page['next_cursor'] ?? $cursor;
             $status = $page['transactions_update_status'] ?? $status;
         } while ($page['has_more'] ?? false);
+
+        $this->categorize->handle(Transaction::query()->whereIn('account_id', $item->accounts()->select('id')));
 
         $item->forceFill([
             'sync_cursor' => filled($cursor) ? $cursor : null,
@@ -145,6 +151,37 @@ class SyncPlaidItem
         );
 
         return count($rows);
+    }
+
+    /**
+     * A posted transaction replaces its pending one, so carry over a category
+     * the user picked on the pending one.
+     *
+     * @param  list<int>  $accountIds
+     * @param  list<array<string, mixed>>  $added
+     */
+    protected function keepCategoriesOfSettledPending(array $accountIds, array $added): void
+    {
+        $postedByPendingId = collect($added)
+            ->reject(fn (array $transaction) => $transaction['pending'] ?? false)
+            ->filter(fn (array $transaction) => filled($transaction['pending_transaction_id'] ?? null))
+            ->pluck('transaction_id', 'pending_transaction_id');
+
+        if ($postedByPendingId->isEmpty()) {
+            return;
+        }
+
+        Transaction::query()
+            ->whereIn('account_id', $accountIds)
+            ->whereIn('plaid_transaction_id', $postedByPendingId->keys())
+            ->where('pending', true)
+            ->where('category_source', CategorySource::Manual)
+            ->whereNotNull('category_id')
+            ->get(['plaid_transaction_id', 'category_id'])
+            ->each(fn (Transaction $pending) => Transaction::query()
+                ->where('plaid_transaction_id', $postedByPendingId[$pending->plaid_transaction_id])
+                ->where(fn ($query) => $query->whereNull('category_id')->orWhere('category_source', CategorySource::Suggested))
+                ->update(['category_id' => $pending->category_id, 'category_source' => CategorySource::Manual]));
     }
 
     /**
