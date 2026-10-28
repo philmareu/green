@@ -63,7 +63,16 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): string => $this->loginLinks());
+            ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): string => $this->loginLinks().$this->privacyLink());
+    }
+
+    protected function privacyLink(): string
+    {
+        return Blade::render(<<<'BLADE'
+            <p style="text-align: center; font-size: 0.875rem;">
+                <x-filament::link :href="route('privacy')" color="gray">Privacy policy</x-filament::link>
+            </p>
+            BLADE);
     }
 
     /**

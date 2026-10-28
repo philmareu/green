@@ -87,7 +87,7 @@ php artisan plaid:sandbox-link 1   # 1 = the Book's id
 
 ### Going to production
 
-Set `APP_ENV=production` and `APP_DEBUG=false`, set `PLAID_ENV=production` and use your production secret, and set `APP_TIMEZONE` (e.g. `America/Chicago`) so due dates and the forecast follow your day. Two things change:
+Set `APP_ENV=production` and `APP_DEBUG=false`, set `PLAID_ENV=production` and use your production secret, and set `APP_TIMEZONE` (e.g. `America/Chicago`) so due dates and the forecast follow your day. Set `PRIVACY_CONTACT_EMAIL` to the address shown on Green's public privacy page (`/privacy`). Two things change:
 
 - **Serve Green over HTTPS.** Plaid requires it in production, and you are storing bank access tokens.
 - **OAuth banks** (Chase, Capital One, Wells Fargo and others) send users back to a registered redirect URL. Set `PLAID_REDIRECT_URI=https://your-domain/plaid/oauth` and add the same URL to the allowed redirect URIs in the Plaid dashboard.

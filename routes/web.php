@@ -17,3 +17,8 @@ Route::get('/plaid/oauth', function (Request $request) {
 
     return redirect()->to($returnUrl.(str_contains($returnUrl, '?') ? '&' : '?').'oauth=1');
 })->name('plaid.oauth');
+
+/*
+ * Public, so it can be linked from the sign-in page and given to Plaid.
+ */
+Route::view('/privacy', 'privacy')->name('privacy');

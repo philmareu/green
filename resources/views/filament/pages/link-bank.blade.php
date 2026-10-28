@@ -26,6 +26,11 @@
                     </p>
                 @endunless
 
+                <p style="font-size: 0.875rem; opacity: 0.8;">
+                    Green keeps what Plaid shares on this server and never sells or shares it.
+                    <x-filament::link :href="route('privacy')" target="_blank">Privacy policy</x-filament::link>
+                </p>
+
                 <div wire:loading.remove wire:target="exchange">
                     <x-filament::button icon="heroicon-o-link" x-on:click="window.greenOpenPlaidLink ? window.greenOpenPlaidLink() : $wire.linkFailed(null, 'Plaid Link is still loading. Try again in a moment.')">
                         Continue to Plaid

@@ -34,6 +34,7 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - Book relation managers query transactions through a join with `accounts`; qualify column names (`$query->qualifyColumn()`) in custom sorts, filters and searches.
 - Eloquent writes `date` casts with a time part on SQLite, while Plaid upserts write plain dates. Compare dates with `whereDate()` or `date(...)` in SQL, never with string equality.
 - "Today", "overdue" and the forecast use `APP_TIMEZONE` (default UTC).
+- `/privacy` (`resources/views/privacy.blade.php`, public, linked from sign-in and Link bank) lists what Green stores and shares. Update it and its "Last updated" date when either changes.
 - Sign-in uses Filament's authenticator-app MFA with recovery codes (`users.app_authentication_secret` and `app_authentication_recovery_codes`, both encrypted), required only when `APP_ENV=production`. Filament evaluates that when it registers routes, so a `route:cache` built outside production leaves MFA optional.
 - `spatie/laravel-login-link` is a dev dependency, and production installs with `--no-dev`. Never use `<x-login-link>` or the package's classes in a view file or in code that runs in production: `php artisan optimize` compiles every view file on deploy and fails.
 
