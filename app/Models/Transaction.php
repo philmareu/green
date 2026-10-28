@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * `amount` keeps Plaid's sign convention: positive = money out of the account,
@@ -90,6 +91,24 @@ class Transaction extends Model
     protected function description(): Attribute
     {
         return Attribute::get(fn (): string => $this->merchant_name ?: $this->name);
+    }
+
+    /**
+     * Whether the merchant or the bank's description contains the text, ignoring case.
+     */
+    public function descriptionContains(string $text): bool
+    {
+        return Str::contains(($this->merchant_name ?? '')."\n".$this->name, $text, ignoreCase: true);
+    }
+
+    /**
+     * The text to look for in other transactions from the same payee: the
+     * merchant, or else the description without reference numbers.
+     */
+    public function payee(): string
+    {
+        return $this->merchant_name
+            ?: Str::of($this->name)->replaceMatches('/[0-9#*]+/', ' ')->squish()->toString();
     }
 
     /**

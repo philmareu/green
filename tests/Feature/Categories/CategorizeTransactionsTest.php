@@ -180,3 +180,40 @@ it('never gives a flex spend’s budget category to a transaction linked to it',
 
     expect($transfer->fresh())->category_id->toBe($this->food->id)->category_source->toBe(CategorySource::Suggested);
 });
+
+it('gives a transaction the category with the longest payee its description contains, ahead of Plaid’s suggestion', function () {
+    $supplies = Category::factory()->for($this->set)->create(['name' => 'Supplies', 'payees' => ['amazon']]);
+    $hosting = Category::factory()->for($this->set)->create(['name' => 'Hosting', 'payees' => ['Amazon Web Services']]);
+    $order = plaidCategorized($this->account, 'FOOD_AND_DRINK', null, ['name' => 'AMAZON MKTPL*2K4', 'merchant_name' => null]);
+    $servers = plaidCategorized($this->account, 'FOOD_AND_DRINK', null, ['name' => 'AWS', 'merchant_name' => 'Amazon Web Services']);
+
+    categorizeAll();
+
+    expect($order->fresh())->category_id->toBe($supplies->id)->category_source->toBe(CategorySource::Payee)
+        ->and($servers->fresh()->category_id)->toBe($hosting->id);
+});
+
+it('keeps your pick and a bill’s category over a payee match', function () {
+    $internet = Category::factory()->for($this->set)->create(['name' => 'Internet']);
+    Category::factory()->for($this->set)->create(['name' => 'Cable', 'payees' => ['comcast']]);
+    $billed = billPayment($this->account, '2026-10-15');
+    $picked = billPayment($this->account, '2026-09-01', ['category_id' => $this->coffee->id, 'category_source' => CategorySource::Manual]);
+    Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-15', 'category_id' => $internet->id]);
+
+    categorizeAll();
+
+    expect($billed->fresh())->category_id->toBe($internet->id)->category_source->toBe(CategorySource::Recurring)
+        ->and($picked->fresh()->category_id)->toBe($this->coffee->id);
+});
+
+it('goes back to Plaid’s suggestion when the payee is removed', function () {
+    $cable = Category::factory()->for($this->set)->create(['name' => 'Cable', 'payees' => ['comcast']]);
+    $payment = billPayment($this->account, '2026-10-01');
+    categorizeAll();
+    expect($payment->fresh()->category_id)->toBe($cable->id);
+
+    $cable->update(['payees' => null]);
+    categorizeAll();
+
+    expect($payment->fresh())->category_id->toBe($this->food->id)->category_source->toBe(CategorySource::Suggested);
+});

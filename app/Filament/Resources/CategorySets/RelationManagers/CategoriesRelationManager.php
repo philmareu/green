@@ -10,6 +10,7 @@ use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -70,6 +71,11 @@ class CategoriesRelationManager extends RelationManager
                     ->searchable()
                     ->helperText('Transactions Plaid files under these get this category as a suggestion. A specific Plaid category wins over an "Any" one.')
                     ->columnSpanFull(),
+                TagsInput::make('payees')
+                    ->label('Use for payees containing')
+                    ->placeholder('e.g. slack')
+                    ->helperText('Transactions whose description contains one of these get this category instead of Plaid’s suggestion; the longest match wins. A payee moves here from any other category in the set.')
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -85,6 +91,13 @@ class CategoriesRelationManager extends RelationManager
                 TextColumn::make('plaid_categories')
                     ->label('Suggested for')
                     ->formatStateUsing(fn (string $state): string => PlaidCategories::label($state))
+                    ->badge()
+                    ->color('gray')
+                    ->limitList(3)
+                    ->expandableLimitedList()
+                    ->wrap()
+                    ->toggleable(),
+                TextColumn::make('payees')
                     ->badge()
                     ->color('gray')
                     ->limitList(3)
@@ -124,7 +137,7 @@ class CategoriesRelationManager extends RelationManager
     }
 
     /**
-     * Refresh suggestions for the set's transactions after its categories change.
+     * Refresh the set's transactions after its categories change.
      */
     protected function recategorize(CategorizeTransactions $categorize): void
     {
