@@ -34,6 +34,7 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - Book relation managers query transactions through a join with `accounts`; qualify column names (`$query->qualifyColumn()`) in custom sorts, filters and searches.
 - Eloquent writes `date` casts with a time part on SQLite, while Plaid upserts write plain dates. Compare dates with `whereDate()` or `date(...)` in SQL, never with string equality.
 - "Today", "overdue" and the forecast use `APP_TIMEZONE` (default UTC).
+- `spatie/laravel-login-link` is a dev dependency, and production installs with `--no-dev`. Never use `<x-login-link>` or the package's classes in a view file or in code that runs in production: `php artisan optimize` compiles every view file on deploy and fails.
 
 <laravel-boost-guidelines>
 === foundation rules ===

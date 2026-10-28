@@ -18,6 +18,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -61,6 +62,9 @@ class AdminPanelProvider extends PanelProvider
     /**
      * One-click "Log in as" buttons for local development, when
      * LOGIN_LINK_ENABLED is on (spatie/laravel-login-link, a dev dependency).
+     *
+     * Rendered from a string rather than a view file: `php artisan view:cache`
+     * compiles every view file on deploy, where the package isn't installed.
      */
     protected function loginLinks(): string
     {
@@ -68,8 +72,12 @@ class AdminPanelProvider extends PanelProvider
             return '';
         }
 
-        return view('filament.auth.login-links', [
-            'users' => User::query()->orderBy('id')->get(),
-        ])->render();
+        return Blade::render(<<<'BLADE'
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                @foreach ($users as $user)
+                    <x-login-link :email="$user->email" :label="'Log in as '.$user->email" />
+                @endforeach
+            </div>
+            BLADE, ['users' => User::query()->orderBy('id')->get()]);
     }
 }
