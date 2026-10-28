@@ -52,6 +52,8 @@ class StarterCategories
                 'Wages' => [],
                 'Other expenses' => [
                     'Software and subscriptions' => [],
+                    'Hosting and infrastructure' => [],
+                    'AI services' => [],
                     'Bank and payment fees' => ['BANK_FEES'],
                     'Dues and memberships' => [],
                     'Education and training' => ['GENERAL_SERVICES_EDUCATION'],
