@@ -16,13 +16,13 @@ use Illuminate\Support\Number;
 
 class RecurringsTable
 {
-    public static function configure(Table $table): Table
+    public static function configure(Table $table, bool $withinAccount = false): Table
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['account', 'category', 'occurrences.transaction']))
             ->columns([
                 TextColumn::make('name')
-                    ->description(fn (Recurring $record): string => $record->account?->display_name ?? 'Needs an account')
+                    ->description(fn (Recurring $record): ?string => $withinAccount ? null : ($record->account?->display_name ?? 'Needs an account'))
                     ->weight('medium')
                     ->searchable()
                     ->sortable(),
@@ -55,7 +55,8 @@ class RecurringsTable
                         ->orderBy('name')
                         ->get()
                         ->mapWithKeys(fn (Account $account): array => [$account->getKey() => $account->display_name])
-                        ->all()),
+                        ->all())
+                    ->visible(! $withinAccount),
             ])
             ->defaultSort('name')
             ->recordUrl(fn (Recurring $record): string => RecurringResource::getUrl('view', ['record' => $record]))
