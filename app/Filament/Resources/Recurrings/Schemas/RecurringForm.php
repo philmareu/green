@@ -118,11 +118,11 @@ class RecurringForm
                 ->options(fn (Get $get): array => static::categorySet($accountId($get))?->categoryOptions() ?? [])
                 ->searchable()
                 ->required($isFlex)
-                ->visible($isFlex)
                 ->helperText(fn (Get $get): string => match (true) {
                     blank($accountId($get)) => 'Pick an account first.',
                     static::categorySet($accountId($get)) === null => 'This account’s Book has no category set. Pick one on the Book first.',
-                    default => 'Spending in this category and its subcategories counts against the budget. Categories come from the account’s Book.',
+                    $isFlex($get) => 'Spending in this category and its subcategories counts against the budget. Categories come from the account’s Book.',
+                    default => 'Optional. Linked payments get this category, unless you picked one for them yourself. Categories come from the account’s Book.',
                 }),
         ];
     }
@@ -157,6 +157,7 @@ class RecurringForm
             'starts_on' => $startsOn->toDateString(),
             'payee' => $payee,
             'amount_tolerance' => 10,
+            'category_id' => $transaction->category_id,
         ];
     }
 

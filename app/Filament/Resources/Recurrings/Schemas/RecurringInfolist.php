@@ -45,8 +45,9 @@ class RecurringInfolist
                             ->hidden($isFlex),
                         TextEntry::make('category.full_name')
                             ->label('Category')
-                            ->placeholder('No category: nothing counts against the budget')
-                            ->visible($isFlex),
+                            ->placeholder(fn (Recurring $record): string => $isFlex($record)
+                                ? 'No category: nothing counts against the budget'
+                                : 'Not set: payments keep their own category'),
                     ]),
             ]);
     }

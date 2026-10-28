@@ -1,14 +1,18 @@
 <?php
 
 use App\Enums\CategorySource;
+use App\Enums\MatchSource;
+use App\Enums\RecurringKind;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Category;
 use App\Models\CategorySet;
+use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Services\Categories\CategorizeTransactions;
 
 beforeEach(function () {
+    $this->travelTo('2026-10-21 12:00');
     $this->set = CategorySet::factory()->create();
     $this->book = Book::factory()->for($this->set->user)->create(['category_set_id' => $this->set->id]);
     $this->account = Account::factory()->inBook($this->book)->create();
@@ -25,6 +29,21 @@ function categorizeAll(): int
 function plaidCategorized(Account $account, string $primary, ?string $detailed = null, array $attributes = []): Transaction
 {
     return Transaction::factory()->for($account)->create(['category_primary' => $primary, 'category_detailed' => $detailed, ...$attributes]);
+}
+
+/**
+ * A payment of the factory's Comcast bill that Plaid files under food.
+ */
+function billPayment(Account $account, string $date, array $attributes = []): Transaction
+{
+    return plaidCategorized($account, 'FOOD_AND_DRINK', null, [
+        'name' => 'COMCAST CABLE 8823',
+        'merchant_name' => null,
+        'amount' => 89.00,
+        'date' => $date,
+        'authorized_date' => $date,
+        ...$attributes,
+    ]);
 }
 
 it('suggests a category from the detailed Plaid category before the primary one', function () {
@@ -108,4 +127,56 @@ it('uncategorizes transactions when their Book is deleted', function () {
 
     expect($this->account->fresh()->book_id)->toBeNull()
         ->and($latte->fresh()->category_id)->toBeNull();
+});
+
+it('gives a bill’s category to its payments instead of Plaid’s suggestion, but not over one you picked', function () {
+    $internet = Category::factory()->for($this->set)->create(['name' => 'Internet']);
+    $september = billPayment($this->account, '2026-09-15');
+    $october = billPayment($this->account, '2026-10-15', ['category_id' => $this->coffee->id, 'category_source' => CategorySource::Manual]);
+    categorizeAll();
+
+    $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-09-15', 'category_id' => $internet->id]);
+
+    expect($comcast->occurrences()->whereNotNull('transaction_id')->count())->toBe(2)
+        ->and($september->fresh())->category_id->toBe($internet->id)->category_source->toBe(CategorySource::Recurring)
+        ->and($october->fresh())->category_id->toBe($this->coffee->id)->category_source->toBe(CategorySource::Manual);
+});
+
+it('follows a bill’s category when you change or clear it', function () {
+    $internet = Category::factory()->for($this->set)->create(['name' => 'Internet']);
+    $phone = Category::factory()->for($this->set)->create(['name' => 'Phone']);
+    $payment = billPayment($this->account, '2026-10-15');
+    $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-15', 'category_id' => $internet->id]);
+
+    $comcast->update(['category_id' => $phone->id]);
+    expect($payment->fresh()->category_id)->toBe($phone->id);
+
+    $comcast->update(['category_id' => null]);
+    expect($payment->fresh())->category_id->toBe($this->food->id)->category_source->toBe(CategorySource::Suggested);
+});
+
+it('gives payments back Plaid’s suggestion when unlinked or when their bill is deleted', function () {
+    $internet = Category::factory()->for($this->set)->create(['name' => 'Internet']);
+    $september = billPayment($this->account, '2026-09-15');
+    $october = billPayment($this->account, '2026-10-15');
+    $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-09-15', 'category_id' => $internet->id]);
+
+    $comcast->occurrences()->where('transaction_id', $september->id)->sole()->unlink();
+    expect($september->fresh())->category_id->toBe($this->food->id)->category_source->toBe(CategorySource::Suggested)
+        ->and($october->fresh()->category_id)->toBe($internet->id);
+
+    $comcast->delete();
+    expect($october->fresh())->category_id->toBe($this->food->id)->category_source->toBe(CategorySource::Suggested);
+});
+
+it('never gives a flex spend’s budget category to a transaction linked to it', function () {
+    $internet = Category::factory()->for($this->set)->create(['name' => 'Internet']);
+    $transfer = billPayment($this->account, '2026-10-15', ['name' => 'ONLINE TRANSFER 3321']);
+    $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-15', 'category_id' => $internet->id]);
+    $comcast->occurrences()->whereDate('due_on', '2026-10-15')->sole()->link($transfer, MatchSource::Manual);
+    expect($transfer->fresh()->category_id)->toBe($internet->id);
+
+    $comcast->update(['kind' => RecurringKind::Flex, 'payee' => null]);
+
+    expect($transfer->fresh())->category_id->toBe($this->food->id)->category_source->toBe(CategorySource::Suggested);
 });
