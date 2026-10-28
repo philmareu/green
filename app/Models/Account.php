@@ -73,6 +73,12 @@ class Account extends Model
         return $this->hasMany(Transaction::class);
     }
 
+    /** @return HasMany<Recurring, $this> */
+    public function recurrings(): HasMany
+    {
+        return $this->hasMany(Recurring::class);
+    }
+
     /**
      * Credit and loan balances are amounts owed, and "available" means remaining
      * credit rather than cash, so they are reported separately from cash.

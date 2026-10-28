@@ -21,20 +21,22 @@ use Illuminate\Support\Str;
 
 class RecurringForm
 {
-    public static function configure(Schema $schema): Schema
+    public static function configure(Schema $schema, ?Account $account = null): Schema
     {
-        return $schema->components(static::components());
+        return $schema->components(static::components($account));
     }
 
     /**
      * Plain fields with no record of their own, so the "Make recurring" action
-     * on a transaction row can use them too.
+     * on a transaction row can use them too. Given an account, as on an
+     * account's page, the account picker is left out and that account is used.
      *
      * @return array<int, mixed>
      */
-    public static function components(): array
+    public static function components(?Account $account = null): array
     {
         $isFlex = fn (Get $get): bool => $get->enum('kind', RecurringKind::class, isNullable: true) === RecurringKind::Flex;
+        $accountId = fn (Get $get): mixed => $account?->getKey() ?? $get('account_id');
 
         return [
             ToggleButtons::make('kind')
@@ -64,6 +66,7 @@ class RecurringForm
                     ->all())
                 ->required()
                 ->live()
+                ->hidden($account !== null)
                 ->helperText(fn (Get $get): string => $isFlex($get)
                     ? 'Use the account you pay with. Groceries bought on a card belong on the card; paying the card is a bill on checking.'
                     : 'The account it’s paid from or into.'),
@@ -112,13 +115,13 @@ class RecurringForm
                 ]),
             Select::make('category_id')
                 ->label('Category')
-                ->options(fn (Get $get): array => static::categorySet($get('account_id'))?->categoryOptions() ?? [])
+                ->options(fn (Get $get): array => static::categorySet($accountId($get))?->categoryOptions() ?? [])
                 ->searchable()
                 ->required($isFlex)
                 ->visible($isFlex)
                 ->helperText(fn (Get $get): string => match (true) {
-                    blank($get('account_id')) => 'Pick an account first.',
-                    static::categorySet($get('account_id')) === null => 'This account’s Book has no category set. Pick one on the Book first.',
+                    blank($accountId($get)) => 'Pick an account first.',
+                    static::categorySet($accountId($get)) === null => 'This account’s Book has no category set. Pick one on the Book first.',
                     default => 'Spending in this category and its subcategories counts against the budget. Categories come from the account’s Book.',
                 }),
         ];

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Accounts;
 use App\Filament\Resources\Accounts\Pages\EditAccount;
 use App\Filament\Resources\Accounts\Pages\ListAccounts;
 use App\Filament\Resources\Accounts\Pages\ViewAccount;
+use App\Filament\Resources\Accounts\RelationManagers\RecurringsRelationManager;
 use App\Filament\Resources\Accounts\RelationManagers\TransactionsRelationManager;
 use App\Filament\Resources\Accounts\Schemas\AccountForm;
 use App\Filament\Resources\Accounts\Schemas\AccountInfolist;
@@ -67,6 +68,7 @@ class AccountResource extends Resource
     {
         return [
             TransactionsRelationManager::class,
+            RecurringsRelationManager::class,
         ];
     }
 
