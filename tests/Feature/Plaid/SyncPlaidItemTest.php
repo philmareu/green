@@ -294,6 +294,28 @@ it('links bills after a sync and keeps your link when the pending transaction po
         ->matched_by->toBe(MatchSource::Manual);
 });
 
+it('gives a bill’s category to the payment a sync links, and to the posted one that replaces it', function () {
+    $this->travelTo('2026-10-21');
+    $set = CategorySet::factory()->for($this->book->user)->create();
+    Category::factory()->for($set)->create(['plaid_categories' => ['FOOD_AND_DRINK_COFFEE']]);
+    $meals = Category::factory()->for($set)->create();
+    $this->book->update(['category_set_id' => $set->id]);
+    Recurring::factory()->for($this->account)->create(['payee' => 'starbucks', 'amount' => 12.50, 'starts_on' => '2026-10-19', 'category_id' => $meals->id]);
+    fakeSyncPages(
+        syncPage(added: [plaidTransaction(['transaction_id' => 'pending-1', 'pending' => true])], nextCursor: 'c1'),
+        syncPage(added: [plaidTransaction(['transaction_id' => 'posted-1', 'pending_transaction_id' => 'pending-1'])], nextCursor: 'c2'),
+    );
+
+    sync($this->item);
+    expect(Transaction::sole())->category_id->toBe($meals->id)->category_source->toBe(CategorySource::Recurring);
+
+    sync($this->item);
+    expect(Transaction::sole())
+        ->plaid_transaction_id->toBe('posted-1')
+        ->category_id->toBe($meals->id)
+        ->category_source->toBe(CategorySource::Recurring);
+});
+
 it('does not link a transaction you unlinked once it posts', function () {
     $this->travelTo('2026-10-21');
     $starbucks = Recurring::factory()->for($this->account)->create(['payee' => 'starbucks', 'amount' => 12.50, 'starts_on' => '2026-10-19']);

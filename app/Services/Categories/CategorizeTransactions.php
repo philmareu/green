@@ -3,6 +3,7 @@
 namespace App\Services\Categories;
 
 use App\Enums\CategorySource;
+use App\Enums\RecurringKind;
 use App\Models\Category;
 use App\Models\CategorySet;
 use App\Models\Transaction;
@@ -14,9 +15,11 @@ use Illuminate\Support\Collection;
  *
  * - A category that isn't in the Book's category set (the account moved, the
  *   Book changed sets, or the account has no Book) is cleared.
- * - Uncategorized transactions, and ones still on a suggestion, get the
- *   category whose Plaid categories match: a detailed match beats a primary one.
  * - A category you picked yourself is otherwise left alone.
+ * - Other transactions that pay a bill or income with a category get that
+ *   category.
+ * - The rest get the category whose Plaid categories match: a detailed match
+ *   beats a primary one.
  */
 class CategorizeTransactions
 {
@@ -34,7 +37,7 @@ class CategorizeTransactions
 
         $transactions->clone()
             ->select($transactions->qualifyColumns(['id', 'account_id', 'category_id', 'category_source', 'category_primary', 'category_detailed']))
-            ->with(['account:id,book_id', 'account.book:id,category_set_id'])
+            ->with(['account:id,book_id', 'account.book:id,category_set_id', 'occurrence:id,recurring_id,transaction_id', 'occurrence.recurring:id,kind,category_id'])
             ->chunkById(500, function (Collection $chunk) use (&$changes): void {
                 foreach ($chunk as $transaction) {
                     [$categoryId, $source] = $this->resolve($transaction);
@@ -76,13 +79,37 @@ class CategorizeTransactions
             [$categoryId, $source] = [null, null];
         }
 
-        if ($categoryId !== null && $source !== CategorySource::Suggested) {
+        if ($categoryId !== null && $source !== CategorySource::Suggested && $source !== CategorySource::Recurring) {
             return [$categoryId, $source];
+        }
+
+        $fromRecurring = $set === null ? null : $this->fromRecurring($set['ids'], $transaction);
+
+        if ($fromRecurring !== null) {
+            return [$fromRecurring, CategorySource::Recurring];
         }
 
         $suggested = $set === null ? null : $this->suggest($set['byPlaidCategory'], $transaction);
 
         return [$suggested, $suggested === null ? null : CategorySource::Suggested];
+    }
+
+    /**
+     * The category of the bill or income this transaction pays, when it's in
+     * the transaction's set. A flex spend's category is its budget, not one
+     * to give the transactions linked to it.
+     *
+     * @param  array<int, true>  $ids
+     */
+    protected function fromRecurring(array $ids, Transaction $transaction): ?int
+    {
+        $recurring = $transaction->occurrence?->recurring;
+
+        if ($recurring === null || $recurring->kind === RecurringKind::Flex || $recurring->category_id === null) {
+            return null;
+        }
+
+        return isset($ids[$recurring->category_id]) ? $recurring->category_id : null;
     }
 
     /**

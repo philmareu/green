@@ -6,6 +6,7 @@ use App\Enums\Frequency;
 use App\Enums\MatchSource;
 use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
+use App\Services\Categories\CategorizeTransactions;
 use App\Services\Recurring\MatchRecurringTransactions;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -25,7 +26,9 @@ use Illuminate\Support\Str;
  *
  * Bills and income are linked to the transaction that paid them only when the
  * transaction's description contains `payee`, so a matching amount alone never
- * counts. `amount` is always positive; `kind` gives the direction.
+ * counts. `amount` is always positive; `kind` gives the direction. A bill's or
+ * income's `category` goes on the transactions linked to it; a flex spend's is
+ * the category its budget counts.
  */
 #[Fillable([
     'user_id',
@@ -61,7 +64,17 @@ class Recurring extends Model
             if ($recurring->wasRecentlyCreated || $recurring->wasChanged(self::MATCH_FIELDS)) {
                 app(MatchRecurringTransactions::class)->forRecurring($recurring);
             }
+
+            if ($recurring->wasChanged(['category_id', 'kind'])) {
+                app(CategorizeTransactions::class)->handle(
+                    Transaction::query()->whereHas('occurrence', fn (Builder $occurrence) => $occurrence->whereBelongsTo($recurring)),
+                );
+            }
         });
+
+        // The database cascade skips model events, so unlink payments first to
+        // give them back their own category.
+        static::deleting(fn (Recurring $recurring) => $recurring->occurrences()->whereNotNull('transaction_id')->get()->each->delete());
     }
 
     protected function casts(): array

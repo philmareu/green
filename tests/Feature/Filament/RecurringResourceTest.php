@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CategorySource;
 use App\Enums\Frequency;
 use App\Enums\MatchSource;
 use App\Enums\OccurrenceResolution;
@@ -11,6 +12,8 @@ use App\Filament\Resources\Recurrings\RelationManagers\OccurrencesRelationManage
 use App\Filament\Resources\Transactions\Pages\ListTransactions;
 use App\Models\Account;
 use App\Models\Book;
+use App\Models\Category;
+use App\Models\CategorySet;
 use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Models\User;
@@ -114,6 +117,22 @@ it('makes a transaction recurring, linking it and earlier payments', function ()
         ->amount->toEqual('91.2000')
         ->and($comcast->starts_on->toDateString())->toBe('2026-08-14')
         ->and($comcast->occurrences()->whereNotNull('transaction_id')->pluck('transaction_id')->all())->toBe([$september->id, $october->id]);
+});
+
+it('makes a categorized transaction recurring, giving its category to earlier payments', function () {
+    $set = CategorySet::factory()->for($this->user)->create();
+    $internet = Category::factory()->for($set)->create(['name' => 'Internet']);
+    $this->account->book->update(['category_set_id' => $set->id]);
+    $september = comcastPayment($this->account, '2026-09-14');
+    $october = comcastPayment($this->account, '2026-10-14');
+    $october->update(['category_id' => $internet->id, 'category_source' => CategorySource::Manual]);
+
+    Livewire::test(ListTransactions::class)
+        ->callAction(TestAction::make('makeRecurring')->table($october))
+        ->assertHasNoFormErrors();
+
+    expect(Recurring::sole()->category_id)->toBe($internet->id)
+        ->and($september->fresh())->category_id->toBe($internet->id)->category_source->toBe(CategorySource::Recurring);
 });
 
 it('links a payment by hand even when it doesn’t match the payee', function () {

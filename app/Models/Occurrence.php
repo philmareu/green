@@ -6,6 +6,7 @@ use App\Enums\MatchSource;
 use App\Enums\OccurrenceResolution;
 use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
+use App\Services\Categories\CategorizeTransactions;
 use Carbon\CarbonImmutable;
 use Database\Factories\OccurrenceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -26,6 +27,33 @@ class Occurrence extends Model
 {
     /** @use HasFactory<OccurrenceFactory> */
     use HasFactory;
+
+    /**
+     * A transaction that pays a bill or income takes its category, so
+     * recategorize transactions as they're linked and unlinked.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (Occurrence $occurrence): void {
+            if ($occurrence->wasRecentlyCreated || $occurrence->wasChanged('transaction_id')) {
+                static::categorize([$occurrence->transaction_id, $occurrence->getPrevious()['transaction_id'] ?? null]);
+            }
+        });
+
+        static::deleted(fn (Occurrence $occurrence) => static::categorize([$occurrence->transaction_id]));
+    }
+
+    /**
+     * @param  list<?int>  $transactionIds
+     */
+    protected static function categorize(array $transactionIds): void
+    {
+        $transactionIds = array_values(array_filter($transactionIds));
+
+        if ($transactionIds !== []) {
+            app(CategorizeTransactions::class)->handle(Transaction::query()->whereKey($transactionIds));
+        }
+    }
 
     protected function casts(): array
     {
