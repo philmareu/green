@@ -145,8 +145,7 @@ class RecurringForm
             }
         }
 
-        $payee = $transaction->merchant_name
-            ?: Str::of($transaction->name)->replaceMatches('/[0-9#*]+/', ' ')->squish()->toString();
+        $payee = $transaction->payee();
 
         return [
             'kind' => $transaction->isInflow() ? RecurringKind::Income->value : RecurringKind::Bill->value,

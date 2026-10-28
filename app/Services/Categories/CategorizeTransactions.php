@@ -18,12 +18,14 @@ use Illuminate\Support\Collection;
  * - A category you picked yourself is otherwise left alone.
  * - Other transactions that pay a bill or income with a category get that
  *   category.
+ * - Next comes a category with a payee the description contains; the longest
+ *   payee wins.
  * - The rest get the category whose Plaid categories match: a detailed match
  *   beats a primary one.
  */
 class CategorizeTransactions
 {
-    /** @var array<int, array{ids: array<int, true>, byPlaidCategory: array<string, int>}> */
+    /** @var array<int, array{ids: array<int, true>, byPlaidCategory: array<string, int>, payees: list<array{0: string, 1: int}>}> */
     private array $sets = [];
 
     /**
@@ -36,7 +38,7 @@ class CategorizeTransactions
         $changes = [];
 
         $transactions->clone()
-            ->select($transactions->qualifyColumns(['id', 'account_id', 'category_id', 'category_source', 'category_primary', 'category_detailed']))
+            ->select($transactions->qualifyColumns(['id', 'account_id', 'name', 'merchant_name', 'category_id', 'category_source', 'category_primary', 'category_detailed']))
             ->with(['account:id,book_id', 'account.book:id,category_set_id', 'occurrence:id,recurring_id,transaction_id', 'occurrence.recurring:id,kind,category_id'])
             ->chunkById(500, function (Collection $chunk) use (&$changes): void {
                 foreach ($chunk as $transaction) {
@@ -79,17 +81,27 @@ class CategorizeTransactions
             [$categoryId, $source] = [null, null];
         }
 
-        if ($categoryId !== null && $source !== CategorySource::Suggested && $source !== CategorySource::Recurring) {
+        if ($categoryId !== null && ! $source?->isAutomatic()) {
             return [$categoryId, $source];
         }
 
-        $fromRecurring = $set === null ? null : $this->fromRecurring($set['ids'], $transaction);
+        if ($set === null) {
+            return [null, null];
+        }
+
+        $fromRecurring = $this->fromRecurring($set['ids'], $transaction);
 
         if ($fromRecurring !== null) {
             return [$fromRecurring, CategorySource::Recurring];
         }
 
-        $suggested = $set === null ? null : $this->suggest($set['byPlaidCategory'], $transaction);
+        $fromPayee = $this->fromPayee($set['payees'], $transaction);
+
+        if ($fromPayee !== null) {
+            return [$fromPayee, CategorySource::Payee];
+        }
+
+        $suggested = $this->suggest($set['byPlaidCategory'], $transaction);
 
         return [$suggested, $suggested === null ? null : CategorySource::Suggested];
     }
@@ -113,6 +125,20 @@ class CategorizeTransactions
     }
 
     /**
+     * @param  list<array{0: string, 1: int}>  $payees  payee and category, longest payee first
+     */
+    protected function fromPayee(array $payees, Transaction $transaction): ?int
+    {
+        foreach ($payees as [$payee, $categoryId]) {
+            if ($transaction->descriptionContains($payee)) {
+                return $categoryId;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param  array<string, int>  $byPlaidCategory
      */
     protected function suggest(array $byPlaidCategory, Transaction $transaction): ?int
@@ -127,7 +153,7 @@ class CategorizeTransactions
     }
 
     /**
-     * @return array{ids: array<int, true>, byPlaidCategory: array<string, int>}
+     * @return array{ids: array<int, true>, byPlaidCategory: array<string, int>, payees: list<array{0: string, 1: int}>}
      */
     protected function set(int $setId): array
     {
@@ -135,18 +161,25 @@ class CategorizeTransactions
             return $this->sets[$setId];
         }
 
-        $categories = Category::query()->where('category_set_id', $setId)->orderBy('id')->get(['id', 'plaid_categories']);
-        $byPlaidCategory = [];
+        $categories = Category::query()->where('category_set_id', $setId)->orderBy('id')->get(['id', 'plaid_categories', 'payees']);
+        $byPlaidCategory = $payees = [];
 
         foreach ($categories as $category) {
             foreach ($category->plaid_categories ?? [] as $code) {
                 $byPlaidCategory[$code] ??= $category->getKey();
             }
+
+            foreach ($category->payees ?? [] as $payee) {
+                $payees[] = [$payee, $category->getKey()];
+            }
         }
+
+        usort($payees, fn (array $a, array $b): int => mb_strlen($b[0]) <=> mb_strlen($a[0]));
 
         return $this->sets[$setId] = [
             'ids' => $categories->mapWithKeys(fn (Category $category): array => [$category->getKey() => true])->all(),
             'byPlaidCategory' => $byPlaidCategory,
+            'payees' => $payees,
         ];
     }
 }

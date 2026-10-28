@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\BookKind;
+use App\Enums\CategorySource;
 use App\Enums\CategoryType;
 use App\Filament\Resources\CategorySets\Pages\CreateCategorySet;
 use App\Filament\Resources\CategorySets\Pages\EditCategorySet;
@@ -151,6 +152,19 @@ it('moves subcategories to the top level when their parent is deleted', function
 
     expect($parent->fresh())->toBeNull()
         ->and($child->fresh()->parent_id)->toBeNull();
+});
+
+it('categorizes a payee’s transactions when you add it to a category', function () {
+    $set = CategorySet::factory()->for($this->user)->create();
+    $software = Category::factory()->for($set)->create(['name' => 'Software']);
+    $book = Book::factory()->for($this->user)->create(['category_set_id' => $set->id]);
+    $slack = Transaction::factory()->for(Account::factory()->inBook($book))->create(['name' => 'SLACK T0123', 'merchant_name' => null]);
+
+    manageCategories($set)
+        ->callAction(TestAction::make('edit')->table($software), data: ['payees' => ['slack']])
+        ->assertHasNoFormErrors();
+
+    expect($slack->fresh())->category_id->toBe($software->id)->category_source->toBe(CategorySource::Payee);
 });
 
 it('refreshes suggestions when a category’s Plaid categories change', function () {

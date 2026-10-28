@@ -12,9 +12,13 @@ use App\Models\Category;
 use App\Models\CategorySet;
 use App\Models\Recurring;
 use App\Models\Transaction;
+use App\Services\Categories\CategorizeTransactions;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\SelectColumn;
@@ -86,6 +90,7 @@ class TransactionsTable
                     }),
             ])
             ->recordActions([
+                static::categorizePayeeAction(),
                 static::makeRecurringAction(),
             ])
             ->paginated([25, 50, 100])
@@ -140,6 +145,50 @@ class TransactionsTable
                 ->weight('medium')
                 ->alignEnd(),
         ];
+    }
+
+    /**
+     * Give a category to every transaction from this one's payee, now and
+     * after each sync, by adding the payee to the category.
+     */
+    public static function categorizePayeeAction(): Action
+    {
+        return Action::make('categorizePayee')
+            ->label('Categorize payee')
+            ->icon(Heroicon::OutlinedTag)
+            ->iconButton()
+            ->tooltip('Categorize everything from this payee')
+            ->color('gray')
+            ->modalHeading('Categorize everything from this payee')
+            ->modalDescription('Green adds the payee to the category, so its transactions get it now and after each sync. Ones you categorized yourself keep their category.')
+            ->modalSubmitActionLabel('Categorize')
+            ->visible(fn (Transaction $record): bool => $record->account?->book?->categorySet !== null)
+            ->schema(fn (Transaction $record): array => [
+                TextInput::make('payee')
+                    ->label('Payee contains')
+                    ->required()
+                    ->maxLength(255)
+                    ->helperText('Transactions whose description contains this get the category. Leave out reference numbers that change.'),
+                Select::make('category_id')
+                    ->label('Category')
+                    ->options($record->account?->book?->categorySet?->categoryOptions() ?? [])
+                    ->searchable()
+                    ->required(),
+            ])
+            ->fillForm(fn (Transaction $record): array => ['payee' => $record->payee(), 'category_id' => $record->category_id])
+            ->action(function (Transaction $record, array $data, CategorizeTransactions $categorize): void {
+                $set = $record->account->book->categorySet;
+                $category = $set->categories()->findOrFail($data['category_id']);
+
+                $category->update(['payees' => [...($category->payees ?? []), $data['payee']]]);
+                $changed = $categorize->forCategorySet($set);
+
+                Notification::make()
+                    ->title("“{$data['payee']}” now goes in {$category->full_name}")
+                    ->body(Str::plural('transaction', $changed, prependCount: true).' changed. New ones get it after each sync.')
+                    ->success()
+                    ->send();
+            });
     }
 
     /**

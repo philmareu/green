@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 
 /**
  * Money you expect to move: a bill, a flex spend (a budget per period, such as
@@ -211,7 +210,7 @@ class Recurring extends Model
             return false;
         }
 
-        if (! Str::contains(($transaction->merchant_name ?? '')."\n".$transaction->name, $this->payee, ignoreCase: true)) {
+        if (! $transaction->descriptionContains($this->payee)) {
             return false;
         }
 
