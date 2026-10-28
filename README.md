@@ -112,6 +112,11 @@ You can always press **Sync now** on a Book, account or bank connection.
 
 - Plaid access tokens are encrypted at rest with your `APP_KEY`. **Back up `.env`.** If you rotate `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` or every bank connection will need to be linked again.
 - Green has no public registration. Create logins with `php artisan make:filament-user`.
+- **Two-factor sign-in.** With `APP_ENV=production`, every user sets up an authenticator app (1Password, Google Authenticator and the like) at their next sign-in and gets one-time recovery codes. Keep them somewhere safe. Elsewhere it's optional, under **Profile**. If someone loses both their device and their codes, clear their two-factor setup from the server so they can set it up again:
+
+  ```bash
+  php artisan tinker --execute 'App\Models\User::where("email", "you@example.com")->update(["app_authentication_secret" => null, "app_authentication_recovery_codes" => null]);'
+  ```
 - Each user only sees their own Books, accounts and connections.
 
 Please report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
