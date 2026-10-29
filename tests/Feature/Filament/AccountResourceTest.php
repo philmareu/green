@@ -9,6 +9,7 @@ use App\Filament\Resources\Accounts\Pages\ListAccounts;
 use App\Filament\Resources\Accounts\Pages\ViewAccount;
 use App\Filament\Resources\Accounts\RelationManagers\RecurringsRelationManager;
 use App\Filament\Resources\Accounts\RelationManagers\TransactionsRelationManager;
+use App\Filament\Resources\Books\BookResource;
 use App\Filament\Resources\Books\Pages\ViewBook;
 use App\Filament\Resources\Books\RelationManagers\AccountsRelationManager;
 use App\Models\Account;
@@ -22,6 +23,7 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\Testing\TestAction;
+use Filament\Tables\Columns\TextColumn;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -97,6 +99,47 @@ it('links account rows to the account page', function () {
 
     Livewire::test(AccountsRelationManager::class, ['ownerRecord' => $this->book, 'pageClass' => ViewBook::class])
         ->assertActionHasUrl(TestAction::make('view')->table($account), $accountUrl);
+});
+
+it('lets you hide the Book column but always shows the name and available balance', function () {
+    Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+
+    Livewire::test(ListAccounts::class)
+        ->assertCanRenderTableColumn('book.name')
+        ->toggleAllTableColumns(false)
+        ->assertCanNotRenderTableColumn('book.name')
+        ->assertCanRenderTableColumn('name')
+        ->assertCanRenderTableColumn('available_balance');
+});
+
+it('links the Book badge to its Book, and nothing for an Unassigned account', function () {
+    $assigned = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $unassigned = Account::factory()->for($this->item)->create(['book_id' => null]);
+    $bookUrl = BookResource::getUrl('view', ['record' => $this->book]);
+
+    Livewire::test(ListAccounts::class)
+        ->assertTableColumnExists('book.name', fn (TextColumn $column): bool => $column->getUrl() === $bookUrl, $assigned)
+        ->assertTableColumnExists('book.name', fn (TextColumn $column): bool => $column->getUrl() === null, $unassigned);
+});
+
+it('counts each account’s recurring items, not someone else’s, and links to its Recurring tab', function () {
+    $account = Account::factory()->for($this->item)->create(['name' => 'Operating']);
+    $none = Account::factory()->for($this->item)->create(['name' => 'Ally Savings']);
+    Recurring::factory()->for($account)->create();
+    Recurring::factory()->for($account)->income()->create();
+    Recurring::factory()->for($account)->for(User::factory())->create();
+    $recurringTab = AccountResource::getUrl('view', ['record' => $account, 'relation' => 'recurring']);
+
+    Livewire::test(ListAccounts::class)
+        ->assertTableColumnFormattedStateSet('recurrings_count', '2', $account)
+        ->assertTableColumnFormattedStateSet('recurrings_count', 'None', $none)
+        ->assertTableColumnExists('recurrings_count', fn (TextColumn $column): bool => $column->getUrl() === $recurringTab, $account)
+        ->sortTable('recurrings_count', 'desc')
+        ->assertCanSeeTableRecords([$account, $none], inOrder: true);
+
+    Livewire::withQueryParams(['relation' => 'recurring'])
+        ->test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertSet('activeRelationManager', 'recurring');
 });
 
 it('shows an account with only its own transactions', function () {

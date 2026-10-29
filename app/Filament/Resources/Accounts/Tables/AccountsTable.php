@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Accounts\Tables;
 
 use App\Filament\Actions\PlaidActions;
 use App\Filament\Resources\Accounts\AccountResource;
+use App\Filament\Resources\Books\BookResource;
 use App\Models\Account;
 use App\Models\Book;
 use Filament\Actions\ActionGroup;
@@ -62,6 +63,9 @@ class AccountsTable
     }
 
     /**
+     * Name and Available always show; the rest can be hidden. The recurring
+     * count also checks each item's own owner, as every user-reachable query does.
+     *
      * @return array<TextColumn>
      */
     public static function columns(bool $withinBook = false): array
@@ -79,6 +83,10 @@ class AccountsTable
                 ->badge()
                 ->color(fn (Account $record) => $record->book?->kind?->getColor() ?? 'gray')
                 ->placeholder('Unassigned')
+                ->url(fn (Account $record): ?string => $record->book
+                    ? BookResource::getUrl('view', ['record' => $record->book])
+                    : null)
+                ->toggleable()
                 ->visible(! $withinBook),
             TextColumn::make('subtype')
                 ->label('Type')
@@ -100,14 +108,24 @@ class AccountsTable
                 ->money(fn (Account $record): string => $record->currency)
                 ->description(fn (Account $record): ?string => $record->isCredit() ? 'owed' : null)
                 ->sortable()
-                ->alignEnd(),
+                ->alignEnd()
+                ->toggleable(),
+            TextColumn::make('recurrings_count')
+                ->label('Recurring')
+                ->counts(['recurrings' => fn (Builder $recurrings) => $recurrings->ownedBy(auth()->user())])
+                ->formatStateUsing(fn (int $state): string => $state > 0 ? (string) $state : 'None')
+                ->color(fn (int $state): ?string => $state > 0 ? null : 'gray')
+                ->url(fn (Account $record): string => AccountResource::getUrl('view', ['record' => $record, 'relation' => 'recurring']))
+                ->sortable()
+                ->toggleable(),
             TextColumn::make('plaidItem.status')
                 ->label('Connection')
                 ->badge()
                 ->description(fn (Account $record): string => $record->plaidItem?->last_synced_at
                     ? 'Synced '.$record->plaidItem->last_synced_at->diffForHumans()
                     : 'Never synced')
-                ->tooltip(fn (Account $record): ?string => $record->plaidItem?->error_message),
+                ->tooltip(fn (Account $record): ?string => $record->plaidItem?->error_message)
+                ->toggleable(),
         ];
     }
 }

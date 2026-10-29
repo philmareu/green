@@ -80,7 +80,8 @@ it('shows a Book with its accounts and transactions', function () {
 
     Livewire::test(AccountsRelationManager::class, ['ownerRecord' => $book, 'pageClass' => ViewBook::class])
         ->assertOk()
-        ->assertCanSeeTableRecords([$account]);
+        ->assertCanSeeTableRecords([$account])
+        ->assertCanNotRenderTableColumn('book.name');
 
     Livewire::test(TransactionsRelationManager::class, ['ownerRecord' => $book, 'pageClass' => ViewBook::class])
         ->assertOk()
