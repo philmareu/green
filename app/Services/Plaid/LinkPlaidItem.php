@@ -3,8 +3,10 @@
 namespace App\Services\Plaid;
 
 use App\Enums\PlaidItemStatus;
+use App\Enums\PlaidLogKind;
 use App\Models\Book;
 use App\Models\PlaidItem;
+use App\Models\PlaidLog;
 use App\Models\User;
 use InvalidArgumentException;
 
@@ -18,6 +20,7 @@ class LinkPlaidItem
     public function __construct(
         private readonly PlaidClient $plaid,
         private readonly UpsertAccounts $upsertAccounts,
+        private readonly PlaidLogger $logger,
     ) {}
 
     public function handle(
@@ -30,6 +33,23 @@ class LinkPlaidItem
         if ($book && $book->user_id !== $user->getKey()) {
             throw new InvalidArgumentException('That Book belongs to another user.');
         }
+
+        return $this->logger->record(
+            PlaidLogKind::Link,
+            $user,
+            fn (PlaidLog $log): PlaidItem => $this->link($log, $user, $book, $publicToken, $institutionId, $institutionName),
+        );
+    }
+
+    protected function link(
+        PlaidLog $log,
+        User $user,
+        ?Book $book,
+        string $publicToken,
+        ?string $institutionId,
+        ?string $institutionName,
+    ): PlaidItem {
+        $log->institution_name = $institutionName;
 
         $exchange = $this->plaid->exchangePublicToken($publicToken);
         $accessToken = $exchange['access_token'];
@@ -54,6 +74,8 @@ class LinkPlaidItem
                 'error_message' => null,
             ],
         );
+
+        $log->forItem($item);
 
         $this->upsertAccounts->handle($item, $this->plaid->getAccounts($accessToken)['accounts'], $book);
 

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\PlaidLogTrigger;
 use App\Models\Book;
 use App\Services\Plaid\LinkPlaidItem;
 use App\Services\Plaid\PlaidClient;
@@ -49,7 +50,7 @@ class PlaidSandboxLinkCommand extends Command
 
         $this->components->info("Linked {$item->institution_name} with {$item->accounts()->count()} account(s) to \"{$book->name}\".");
 
-        $result = $sync->handle($item);
+        $result = $sync->handle($item, PlaidLogTrigger::Link);
 
         $result->successful
             ? $this->components->info('Transactions synced: '.$result->summary())

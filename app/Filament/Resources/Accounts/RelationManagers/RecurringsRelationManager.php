@@ -10,6 +10,7 @@ use Filament\Actions\CreateAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * The account's bills, flex spends and income, added and edited here without
@@ -23,6 +24,24 @@ class RecurringsRelationManager extends RelationManager
 
     /** @var array<string, string> */
     protected $listeners = [PlaidActions::SYNCED_EVENT => '$refresh'];
+
+    public static function getBadge(Model $ownerRecord, string $pageClass): ?string
+    {
+        /** @var Account $ownerRecord */
+        $overdue = $ownerRecord->recurrings()->overdue()->count();
+
+        return $overdue > 0 ? (string) $overdue : null;
+    }
+
+    public static function getBadgeColor(Model $ownerRecord, string $pageClass): ?string
+    {
+        return 'danger';
+    }
+
+    public static function getBadgeTooltip(Model $ownerRecord, string $pageClass): ?string
+    {
+        return 'Overdue bills and income';
+    }
 
     public function isReadOnly(): bool
     {

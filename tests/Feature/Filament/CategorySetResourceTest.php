@@ -3,6 +3,7 @@
 use App\Enums\BookKind;
 use App\Enums\CategorySource;
 use App\Enums\CategoryType;
+use App\Filament\Resources\Books\BookResource;
 use App\Filament\Resources\CategorySets\Pages\CreateCategorySet;
 use App\Filament\Resources\CategorySets\Pages\EditCategorySet;
 use App\Filament\Resources\CategorySets\Pages\ListCategorySets;
@@ -35,6 +36,15 @@ it('lists only your category sets', function () {
         ->assertOk()
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$theirs]);
+});
+
+it('links a set to the Books that use it', function () {
+    $set = CategorySet::factory()->for($this->user)->create();
+    $book = Book::factory()->for($this->user)->create(['category_set_id' => $set->id]);
+    $bookLink = 'href="'.BookResource::getUrl('view', ['record' => $book]).'"';
+
+    Livewire::test(ListCategorySets::class)->assertSeeHtml($bookLink);
+    Livewire::test(ViewCategorySet::class, ['record' => $set->getRouteKey()])->assertSeeHtml($bookLink);
 });
 
 it('creates a set with suggested categories', function () {

@@ -7,6 +7,7 @@ use App\Filament\Resources\Books\Pages\ListBooks;
 use App\Filament\Resources\Books\Pages\ViewBook;
 use App\Filament\Resources\Books\RelationManagers\AccountsRelationManager;
 use App\Filament\Resources\Books\RelationManagers\TransactionsRelationManager;
+use App\Filament\Resources\CategorySets\CategorySetResource;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\CategorySet;
@@ -80,7 +81,8 @@ it('shows a Book with its accounts and transactions', function () {
 
     Livewire::test(AccountsRelationManager::class, ['ownerRecord' => $book, 'pageClass' => ViewBook::class])
         ->assertOk()
-        ->assertCanSeeTableRecords([$account]);
+        ->assertCanSeeTableRecords([$account])
+        ->assertCanNotRenderTableColumn('book.name');
 
     Livewire::test(TransactionsRelationManager::class, ['ownerRecord' => $book, 'pageClass' => ViewBook::class])
         ->assertOk()
@@ -89,6 +91,16 @@ it('shows a Book with its accounts and transactions', function () {
         ->assertCanNotSeeTableRecords([$transaction])
         ->searchTable($transaction->merchant_name)
         ->assertOk();
+});
+
+it('links each Book to its category set, when it has one', function () {
+    $set = CategorySet::factory()->for($this->user)->create();
+    $withSet = Book::factory()->for($this->user)->create(['category_set_id' => $set->id]);
+    $withoutSet = Book::factory()->for($this->user)->create(['category_set_id' => null]);
+
+    Livewire::test(ListBooks::class)
+        ->assertTableColumnExists('categorySet.name', linksTo(CategorySetResource::getUrl('view', ['record' => $set])), $withSet)
+        ->assertTableColumnExists('categorySet.name', linksTo(null), $withoutSet);
 });
 
 it('hides other users’ Books', function () {

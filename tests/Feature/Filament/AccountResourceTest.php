@@ -9,8 +9,10 @@ use App\Filament\Resources\Accounts\Pages\ListAccounts;
 use App\Filament\Resources\Accounts\Pages\ViewAccount;
 use App\Filament\Resources\Accounts\RelationManagers\RecurringsRelationManager;
 use App\Filament\Resources\Accounts\RelationManagers\TransactionsRelationManager;
+use App\Filament\Resources\Books\BookResource;
 use App\Filament\Resources\Books\Pages\ViewBook;
 use App\Filament\Resources\Books\RelationManagers\AccountsRelationManager;
+use App\Filament\Resources\PlaidItems\PlaidItemResource;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Category;
@@ -19,7 +21,11 @@ use App\Models\PlaidItem;
 use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\Testing\TestAction;
+use Filament\Tables\Columns\TextColumn;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
@@ -96,6 +102,62 @@ it('links account rows to the account page', function () {
         ->assertActionHasUrl(TestAction::make('view')->table($account), $accountUrl);
 });
 
+it('lets you hide the Book column but always shows the name and available balance', function () {
+    Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+
+    Livewire::test(ListAccounts::class)
+        ->assertCanRenderTableColumn('book.name')
+        ->toggleAllTableColumns(false)
+        ->assertCanNotRenderTableColumn('book.name')
+        ->assertCanRenderTableColumn('name')
+        ->assertCanRenderTableColumn('available_balance');
+});
+
+it('links the Book badge to its Book, and nothing for an Unassigned account', function () {
+    $assigned = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $unassigned = Account::factory()->for($this->item)->create(['book_id' => null]);
+    $bookUrl = BookResource::getUrl('view', ['record' => $this->book]);
+
+    Livewire::test(ListAccounts::class)
+        ->assertTableColumnExists('book.name', fn (TextColumn $column): bool => $column->getUrl() === $bookUrl, $assigned)
+        ->assertTableColumnExists('book.name', fn (TextColumn $column): bool => $column->getUrl() === null, $unassigned);
+});
+
+it('counts each account’s recurring items, not someone else’s, and links to its Recurring tab', function () {
+    $account = Account::factory()->for($this->item)->create(['name' => 'Operating']);
+    $none = Account::factory()->for($this->item)->create(['name' => 'Ally Savings']);
+    Recurring::factory()->for($account)->create();
+    Recurring::factory()->for($account)->income()->create();
+    Recurring::factory()->for($account)->for(User::factory())->create();
+    $recurringTab = AccountResource::getUrl('view', ['record' => $account, 'relation' => 'recurring']);
+
+    Livewire::test(ListAccounts::class)
+        ->assertTableColumnFormattedStateSet('recurrings_count', '2', $account)
+        ->assertTableColumnFormattedStateSet('recurrings_count', 'None', $none)
+        ->assertTableColumnExists('recurrings_count', fn (TextColumn $column): bool => $column->getUrl() === $recurringTab, $account)
+        ->sortTable('recurrings_count', 'desc')
+        ->assertCanSeeTableRecords([$account, $none], inOrder: true);
+
+    Livewire::withQueryParams(['relation' => 'recurring'])
+        ->test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertSet('activeRelationManager', 'recurring');
+});
+
+it('links an account to its Book and its bank connection', function () {
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+
+    Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertSchemaComponentExists('book.name', 'infolist', linksTo(BookResource::getUrl('view', ['record' => $this->book])))
+        ->assertSchemaComponentExists('plaidItem.institution_name', 'infolist', linksTo(PlaidItemResource::getUrl(parameters: ['search' => $this->item->institution_name])));
+});
+
+it('leaves an unassigned account’s Book unlinked', function () {
+    $account = Account::factory()->for($this->item)->create(['book_id' => null]);
+
+    Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertSchemaComponentExists('book.name', 'infolist', linksTo(null));
+});
+
 it('shows an account with only its own transactions', function () {
     $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id, 'available_balance' => 1234.56]);
     $sibling = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
@@ -148,6 +210,32 @@ it('refreshes a live balance', function () {
     expect((float) $account->fresh()->available_balance)->toBe(321.5);
 });
 
+it('warns that Plaid bills a live balance and calls Plaid only once confirmed', function () {
+    $account = Account::factory()->for($this->item)->create(['plaid_account_id' => 'acc-checking']);
+    Http::fake([PLAID.'/accounts/balance/get' => Http::response(['accounts' => [plaidAccount()], 'item' => []])]);
+    $page = Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()]);
+
+    $page->mountAction('refreshLiveBalance');
+
+    $page->assertActionMounted('refreshLiveBalance')->assertMountedActionModalSee('Plaid bills every live balance request');
+    Http::assertNothingSent();
+
+    $page->callMountedAction();
+
+    $page->assertNotified('Balance updated');
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => $request->url() === PLAID.'/accounts/balance/get');
+});
+
+it('puts Live balance in the account page’s Actions menu', function () {
+    $account = Account::factory()->for($this->item)->create();
+
+    $headerActions = Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])->instance()->getCachedHeaderActions();
+
+    $actionsMenu = collect($headerActions)->first(fn (Action|ActionGroup $action): bool => $action instanceof ActionGroup && $action->getLabel() === 'Actions');
+    expect($actionsMenu?->getFlatActions())->toHaveKey('refreshLiveBalance');
+});
+
 it('shows only the account’s own recurring items', function () {
     $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
     $sibling = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
@@ -158,6 +246,32 @@ it('shows only the account’s own recurring items', function () {
         ->assertOk()
         ->assertCanSeeTableRecords([$comcast])
         ->assertCanNotSeeTableRecords([$elsewhere]);
+});
+
+it('lists the account’s soonest due recurring items first', function () {
+    $this->travelTo('2026-10-01');
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $comcast = Recurring::factory()->for($account)->create(['name' => 'Comcast', 'starts_on' => '2026-10-25']);
+    $rent = Recurring::factory()->for($account)->create(['name' => 'Rent', 'starts_on' => '2026-10-15']);
+    $this->travelTo('2026-10-21 12:00');
+
+    Livewire::test(RecurringsRelationManager::class, ['ownerRecord' => $account, 'pageClass' => ViewAccount::class])
+        ->assertCanSeeTableRecords([$rent, $comcast], inOrder: true);
+});
+
+it('badges the Recurring tab with how many of the account’s items are overdue', function () {
+    $this->travelTo('2026-10-01');
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $sibling = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $quiet = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    Recurring::factory()->for($account)->create(['starts_on' => '2026-10-15']);
+    Recurring::factory()->for($account)->create(['starts_on' => '2026-10-25']);
+    Recurring::factory()->for($sibling)->create(['starts_on' => '2026-10-15']);
+    Recurring::factory()->for($quiet)->create(['starts_on' => '2026-10-25']);
+    $this->travelTo('2026-10-21 12:00');
+
+    expect(RecurringsRelationManager::getBadge($account, ViewAccount::class))->toBe('1')
+        ->and(RecurringsRelationManager::getBadge($quiet, ViewAccount::class))->toBeNull();
 });
 
 it('adds a bill from the account page without picking the account, and links its earlier payment', function () {

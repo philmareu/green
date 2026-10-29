@@ -64,11 +64,15 @@ class AccountResource extends Resource
         return AccountsTable::configure($table);
     }
 
+    /**
+     * The keys name each tab in the URL (`?relation=recurring`), which the
+     * account list links to, so keep them when reordering.
+     */
     public static function getRelations(): array
     {
         return [
-            TransactionsRelationManager::class,
-            RecurringsRelationManager::class,
+            'transactions' => TransactionsRelationManager::class,
+            'recurring' => RecurringsRelationManager::class,
         ];
     }
 

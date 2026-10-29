@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Books\Pages;
 
+use App\Filament\Actions\PageActions;
 use App\Filament\Resources\Books\BookResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -15,8 +16,10 @@ class EditBook extends EditRecord
     {
         return [
             ViewAction::make(),
-            DeleteAction::make()
-                ->modalDescription('The Book is deleted. Its bank accounts stay linked and become unassigned.'),
+            PageActions::group([
+                DeleteAction::make()
+                    ->modalDescription('The Book is deleted. Its bank accounts stay linked and become unassigned.'),
+            ]),
         ];
     }
 }

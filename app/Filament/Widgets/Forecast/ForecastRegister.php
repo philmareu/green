@@ -5,6 +5,7 @@ namespace App\Filament\Widgets\Forecast;
 use App\Enums\Frequency;
 use App\Enums\RecurringKind;
 use App\Filament\Actions\RecurringActions;
+use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Filament\Widgets\Forecast\Concerns\InteractsWithForecast;
 use App\Models\Recurring;
 use App\Services\Recurring\ForecastEntry;
@@ -48,6 +49,7 @@ class ForecastRegister extends TableWidget
             ->records(fn (): array => collect($this->forecast()?->entries ?? [])
                 ->mapWithKeys(fn (ForecastEntry $entry): array => [$entry->occurrenceId => [
                     'occurrence' => $entry->occurrenceId,
+                    'recurring' => $entry->recurringId,
                     'date' => $entry->date->toDateString(),
                     'name' => $entry->name,
                     'note' => $entry->note ?? ($entry->isOneTime ? 'One time' : null),
@@ -62,6 +64,7 @@ class ForecastRegister extends TableWidget
                     ->date('D, M j'),
                 TextColumn::make('name')
                     ->description(fn (array $record): ?string => $record['note'])
+                    ->url(fn (array $record): string => RecurringResource::getUrl('view', ['record' => $record['recurring']]))
                     ->weight('medium')
                     ->wrap(),
                 TextColumn::make('kind')

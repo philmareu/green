@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Frequency;
+use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Filament\Widgets\Forecast\ForecastRegister;
 use App\Filament\Widgets\Forecast\ForecastStats;
 use App\Models\Account;
@@ -29,6 +30,14 @@ it('forecasts your own account even when the filters name someone else’s', fun
         ->assertSee('$1,000.00')
         ->assertSee('$911.00')
         ->assertDontSee('$55,555.00');
+});
+
+it('links each register line to its recurring item', function () {
+    $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-25']);
+    $dueDate = $comcast->occurrences()->whereDate('due_on', '2026-10-25')->sole();
+
+    Livewire::test(ForecastRegister::class, ['pageFilters' => ['account' => $this->account->id, 'weeks' => 4]])
+        ->assertTableColumnExists('name', linksTo(RecurringResource::getUrl('view', ['record' => $comcast])), $dueDate->id);
 });
 
 it('adds a one-time expense to the register', function () {

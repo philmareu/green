@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Recurrings\Tables;
 
 use App\Enums\RecurringKind;
 use App\Filament\Actions\RecurringActions;
+use App\Filament\Resources\Accounts\AccountResource;
 use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Models\Account;
 use App\Models\Recurring;
@@ -22,10 +23,17 @@ class RecurringsTable
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['account', 'category', 'occurrences.transaction']))
             ->columns([
                 TextColumn::make('name')
-                    ->description(fn (Recurring $record): ?string => $withinAccount ? null : ($record->account?->display_name ?? 'Needs an account'))
                     ->weight('medium')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('account.name')
+                    ->label('Account')
+                    ->formatStateUsing(fn (Recurring $record): string => $record->account->display_name)
+                    ->url(fn (Recurring $record): ?string => $record->account
+                        ? AccountResource::getUrl('view', ['record' => $record->account])
+                        : null)
+                    ->placeholder('Needs an account')
+                    ->visible(! $withinAccount),
                 TextColumn::make('kind')
                     ->badge(),
                 TextColumn::make('amount')
@@ -38,7 +46,8 @@ class RecurringsTable
                     ->date('M j, Y')
                     ->description(fn (Recurring $record): ?string => $record->nextOccurrence()?->status()->getLabel())
                     ->color(fn (Recurring $record): ?string => $record->nextOccurrence()?->status()->getColor())
-                    ->placeholder('Nothing due'),
+                    ->placeholder('Nothing due')
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByNextDue($direction)),
                 TextColumn::make('latest')
                     ->label('Latest')
                     ->state(fn (Recurring $record): ?string => static::latest($record))
@@ -58,7 +67,7 @@ class RecurringsTable
                         ->all())
                     ->visible(! $withinAccount),
             ])
-            ->defaultSort('name')
+            ->defaultSort('next')
             ->recordUrl(fn (Recurring $record): string => RecurringResource::getUrl('view', ['record' => $record]))
             ->recordActions([
                 EditAction::make()->iconButton(),

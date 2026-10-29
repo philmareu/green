@@ -65,7 +65,7 @@
 <body>
     <main>
         <h1>Privacy policy</h1>
-        <p class="muted">Green · Last updated October 28, 2026</p>
+        <p class="muted">Green · Last updated October 29, 2026</p>
 
         <p>
             Green is an open-source personal finance app. This copy of Green is run privately by its owner
@@ -78,6 +78,7 @@
             <li>Sign-in sessions, which record your IP address and browser.</li>
             <li>From each bank you connect through Plaid: the bank's name; each account's name, type, last few digits and balances; and its transactions, including the date, amount, description, merchant, category and the rest of the record Plaid provides, which can include the merchant's location.</li>
             <li>What you add yourself, such as Books, categories, recurring bills, budgets and expected income.</li>
+            <li>A log of Green's activity with Plaid, so sync problems can be spotted: for each sync, live balance check, bank link or removal, the bank's name, when it ran and what started it, how long it took, how many transactions it added, updated or removed, whether it worked (with Plaid's error code and message if not), and Plaid's ID for each request. The log never holds access tokens or any transaction details, and each entry is deleted after 14 days.</li>
         </ul>
         <p>
             Green never sees your bank username or password: you enter them with Plaid. It doesn't request full account
@@ -109,7 +110,8 @@
         <h2>How long it's kept, and deleting it</h2>
         <p>
             Data from a bank is kept while that bank stays connected. Removing a bank connection in Green revokes
-            Green's access at Plaid and deletes that connection's accounts and transactions. To delete everything,
+            Green's access at Plaid and deletes that connection's accounts and transactions; its entries in the Plaid
+            activity log stay until they are 14 days old, like every entry there. To delete everything,
             including your login, ask the owner of this installation. Server backups, if any, are replaced on their
             normal schedule.
         </p>

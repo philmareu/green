@@ -108,6 +108,8 @@ Locally, `php artisan schedule:work` does the same in the foreground.
 
 You can always press **Sync now** on a Book, account or bank connection.
 
+**Plaid Activity** lists every sync, Live balance, bank link and removal from the last 14 days: what started it, how long it took, what changed, any error, and Plaid's request IDs to match the log in Plaid's dashboard. The scheduler prunes older entries daily with `model:prune`.
+
 ## Security
 
 - Plaid access tokens are encrypted at rest with your `APP_KEY`. **Back up `.env`.** If you rotate `APP_KEY`, list the old key in `APP_PREVIOUS_KEYS` or every bank connection will need to be linked again.

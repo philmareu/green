@@ -1,10 +1,15 @@
 <?php
 
+use App\Filament\Resources\Accounts\AccountResource;
+use App\Filament\Resources\Books\BookResource;
 use App\Filament\Resources\PlaidItems\Pages\ListPlaidItems;
+use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Filament\Resources\Transactions\Pages\ListTransactions;
 use App\Models\Account;
 use App\Models\Book;
+use App\Models\Occurrence;
 use App\Models\PlaidItem;
+use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -44,6 +49,38 @@ it('filters transactions by Book', function () {
         ->filterTable('book', $business->id)
         ->assertCanSeeTableRecords([$inBusiness])
         ->assertCanNotSeeTableRecords([$inPersonal]);
+});
+
+it('links a transaction to its account, its Book and the recurring item it pays', function () {
+    $book = Book::factory()->for($this->user)->create();
+    $account = Account::factory()->inBook($book)->create();
+    $transaction = Transaction::factory()->for($account)->create();
+    $comcast = Recurring::factory()->for($account)->create(['payee' => null]);
+    Occurrence::factory()->for($comcast)->create(['due_on' => today()->subWeek(), 'transaction_id' => $transaction->id]);
+
+    Livewire::test(ListTransactions::class)
+        ->assertTableColumnExists('account.name', linksTo(AccountResource::getUrl('view', ['record' => $account])), $transaction)
+        ->assertTableColumnExists('account.book.name', linksTo(BookResource::getUrl('view', ['record' => $book])), $transaction)
+        ->assertSeeHtml('href="'.RecurringResource::getUrl('view', ['record' => $comcast]).'"');
+});
+
+it('leaves the Book unlinked for a transaction on an unassigned account', function () {
+    $account = Account::factory()->for(PlaidItem::factory()->for($this->user))->create(['book_id' => null]);
+    $transaction = Transaction::factory()->for($account)->create();
+
+    Livewire::test(ListTransactions::class)
+        ->assertTableColumnExists('account.book.name', linksTo(null), $transaction);
+});
+
+it('escapes the recurring item’s name in its link', function () {
+    $account = Account::factory()->inBook(Book::factory()->for($this->user)->create())->create();
+    $transaction = Transaction::factory()->for($account)->create();
+    $recurring = Recurring::factory()->for($account)->create(['name' => '<b>Rent</b>', 'payee' => null]);
+    Occurrence::factory()->for($recurring)->create(['due_on' => today()->subWeek(), 'transaction_id' => $transaction->id]);
+
+    Livewire::test(ListTransactions::class)
+        ->assertSeeHtml('&lt;b&gt;Rent&lt;/b&gt;</a>')
+        ->assertDontSeeHtml('<b>Rent</b>');
 });
 
 it('lists your bank connections', function () {

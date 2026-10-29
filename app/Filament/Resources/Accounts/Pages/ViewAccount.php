@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Accounts\Pages;
 
+use App\Filament\Actions\PageActions;
 use App\Filament\Actions\PlaidActions;
 use App\Filament\Resources\Accounts\AccountResource;
 use Filament\Actions\EditAction;
@@ -16,8 +17,10 @@ class ViewAccount extends ViewRecord
         return [
             PlaidActions::reconnect(),
             PlaidActions::sync()->label('Sync'),
-            PlaidActions::refreshLiveBalance(),
             EditAction::make(),
+            PageActions::group([
+                PlaidActions::refreshLiveBalance(),
+            ]),
         ];
     }
 }

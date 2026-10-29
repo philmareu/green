@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Accounts\Schemas;
 
+use App\Filament\Resources\Books\BookResource;
+use App\Filament\Resources\PlaidItems\PlaidItemResource;
 use App\Models\Account;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -43,10 +45,16 @@ class AccountInfolist
                             ->label('Book')
                             ->badge()
                             ->color(fn (Account $record) => $record->book?->kind?->getColor() ?? 'gray')
-                            ->placeholder('Unassigned'),
+                            ->placeholder('Unassigned')
+                            ->url(fn (Account $record): ?string => $record->book
+                                ? BookResource::getUrl('view', ['record' => $record->book])
+                                : null),
                         TextEntry::make('plaidItem.institution_name')
                             ->label('Bank')
-                            ->helperText(fn (Account $record): ?string => $record->official_name),
+                            ->helperText(fn (Account $record): ?string => $record->official_name)
+                            ->url(fn (Account $record): string => PlaidItemResource::getUrl(parameters: array_filter([
+                                'search' => $record->plaidItem?->institution_name,
+                            ]))),
                         TextEntry::make('subtype')
                             ->label('Type')
                             ->formatStateUsing(fn (?string $state): string => Str::headline($state ?? ''))

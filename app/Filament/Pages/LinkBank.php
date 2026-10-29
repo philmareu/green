@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Enums\PlaidItemStatus;
+use App\Enums\PlaidLogTrigger;
 use App\Filament\Resources\Accounts\AccountResource;
 use App\Filament\Resources\Books\BookResource;
 use App\Filament\Resources\PlaidItems\PlaidItemResource;
@@ -95,7 +96,7 @@ class LinkBank extends Page
         if ($item = $this->item($this->itemId)) {
             // Update mode: the existing access token works again; no exchange needed.
             $item->forceFill(['status' => PlaidItemStatus::Active, 'error_code' => null, 'error_message' => null])->save();
-            $result = $sync->handle($item);
+            $result = $sync->handle($item, PlaidLogTrigger::Reconnect);
 
             $this->finish("{$item->institution_name} reconnected", $result->summary(), PlaidItemResource::getUrl());
 
@@ -112,7 +113,7 @@ class LinkBank extends Page
             return;
         }
 
-        $result = $sync->handle($item);
+        $result = $sync->handle($item, PlaidLogTrigger::Link);
         $accounts = $item->accounts()->count();
 
         $this->finish(

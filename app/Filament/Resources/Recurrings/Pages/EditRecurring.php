@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Recurrings\Pages;
 
+use App\Filament\Actions\PageActions;
 use App\Filament\Resources\Recurrings\RecurringResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -15,8 +16,10 @@ class EditRecurring extends EditRecord
     {
         return [
             ViewAction::make(),
-            DeleteAction::make()
-                ->modalDescription('Its due dates are deleted. The transactions stay.'),
+            PageActions::group([
+                DeleteAction::make()
+                    ->modalDescription('Its due dates are deleted. The transactions stay.'),
+            ]),
         ];
     }
 

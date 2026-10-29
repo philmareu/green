@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\CategorySets\Schemas;
 
+use App\Filament\Resources\Books\BookResource;
+use App\Models\Book;
 use App\Models\CategorySet;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -24,6 +26,7 @@ class CategorySetInfolist
                         TextEntry::make('books.name')
                             ->label('Used by')
                             ->badge()
+                            ->url(fn (Book $relatedRecord): string => BookResource::getUrl('view', ['record' => $relatedRecord]))
                             ->placeholder('No Books yet'),
                     ]),
             ]);

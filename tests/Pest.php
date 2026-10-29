@@ -1,5 +1,7 @@
 <?php
 
+use Filament\Infolists\Components\Entry;
+use Filament\Tables\Columns\Column;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -95,4 +97,23 @@ function plaidError(string $code, string $type = 'ITEM_ERROR', int $status = 400
         ],
         'status' => $status,
     ];
+}
+
+/*
+|--------------------------------------------------------------------------
+| Filament helpers
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * For assertTableColumnExists() and assertSchemaComponentExists(): the column
+ * or entry links to the URL, or to nothing when it's null.
+ */
+function linksTo(?string $url): Closure
+{
+    return function (Column|Entry $component) use ($url): bool {
+        expect($component->getUrl())->toBe($url);
+
+        return true;
+    };
 }
