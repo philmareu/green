@@ -180,6 +180,18 @@ class Occurrence extends Model
         $query->whereNull('transaction_id')->whereNull('resolution');
     }
 
+    /**
+     * The due dates `status()` calls overdue: a bill's or income's, unpaid,
+     * before today. A flex period is never overdue.
+     */
+    #[Scope]
+    protected function overdue(Builder $query): void
+    {
+        $query->open()
+            ->whereDate('due_on', '<', today()->toDateString())
+            ->whereHas('recurring', fn (Builder $recurring) => $recurring->where('kind', '!=', RecurringKind::Flex));
+    }
+
     #[Scope]
     protected function ownedBy(Builder $query, User $user): void
     {

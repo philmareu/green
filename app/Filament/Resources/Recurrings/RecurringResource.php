@@ -41,6 +41,23 @@ class RecurringResource extends Resource
         return parent::getEloquentQuery()->ownedBy(auth()->user());
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        $overdue = static::getEloquentQuery()->overdue()->count();
+
+        return $overdue > 0 ? (string) $overdue : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Overdue bills and income';
+    }
+
     public static function form(Schema $schema): Schema
     {
         return RecurringForm::configure($schema);

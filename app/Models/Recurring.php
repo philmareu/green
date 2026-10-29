@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Frequency;
 use App\Enums\MatchSource;
+use App\Enums\OccurrenceResolution;
 use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
 use App\Services\Categories\CategorizeTransactions;
@@ -288,5 +289,88 @@ class Recurring extends Model
     protected function ownedBy(Builder $query, User $user): void
     {
         $query->where('user_id', $user->getKey());
+    }
+
+    /**
+     * Items with a due date `Occurrence::status()` calls overdue.
+     */
+    #[Scope]
+    protected function overdue(Builder $query): void
+    {
+        $query->whereHas('occurrences', fn (Builder $occurrence) => $occurrence->overdue());
+    }
+
+    /**
+     * Order by the due date `nextOccurrence()` picks, with items that have
+     * nothing due last either way, then by name.
+     */
+    #[Scope]
+    protected function orderByNextDue(Builder $query, string $direction = 'asc'): void
+    {
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+        [$nextDueOn, $bindings] = $this->nextDueOnSql();
+
+        $query->orderByRaw("({$nextDueOn}) is null", $bindings)
+            ->orderByRaw("({$nextDueOn}) {$direction}", $bindings)
+            ->orderBy($this->qualifyColumn('name'));
+    }
+
+    /**
+     * SQL for the due date `nextOccurrence()` picks, with its bindings: a bill's
+     * or income's earliest unpaid due date, or a flex spend's current period,
+     * else its next one.
+     *
+     * The current period is the latest one that has started, unless it was
+     * skipped or is over. It runs until the next period starts, so it is still
+     * running when a later due date exists (they are created in order, so that
+     * is the next period), when the item is one-time, or, with no later due
+     * date (the item has ended), when it started less than one period ago.
+     *
+     * @return array{string, list<mixed>}
+     */
+    protected function nextDueOnSql(): array
+    {
+        $today = today()->toImmutable();
+        $dueDates = fn (string $alias): Builder => Occurrence::query()
+            ->from('occurrences', $alias)
+            ->whereColumn("{$alias}.recurring_id", $this->qualifyColumn('id'));
+
+        $unpaid = $dueDates('unpaid')
+            ->selectRaw('min(date(unpaid.due_on))')
+            ->where($this->qualifyColumn('kind'), '!=', RecurringKind::Flex)
+            ->open();
+
+        $currentPeriod = $dueDates('started')
+            ->selectRaw('date(started.due_on)')
+            ->where($this->qualifyColumn('kind'), RecurringKind::Flex)
+            ->whereDate('started.due_on', '<=', $today->toDateString())
+            ->whereNotExists($dueDates('later')
+                ->whereRaw('date(later.due_on) > date(started.due_on)')
+                ->whereDate('later.due_on', '<=', $today->toDateString()))
+            ->where(fn (Builder $started) => $started
+                ->whereNull('started.resolution')
+                ->orWhere('started.resolution', '!=', OccurrenceResolution::Skipped))
+            ->where(function (Builder $running) use ($dueDates, $today): void {
+                $running->whereExists($dueDates('later')->whereDate('later.due_on', '>', $today->toDateString()));
+
+                foreach (Frequency::cases() as $frequency) {
+                    $running->orWhere(fn (Builder $started) => $started
+                        ->where($this->qualifyColumn('frequency'), $frequency)
+                        ->when($frequency !== Frequency::Once, fn (Builder $started) => $started
+                            ->whereDate('started.due_on', '>', $frequency->nth($today, -1)->toDateString())));
+                }
+            });
+
+        $nextPeriod = $dueDates('upcoming')
+            ->selectRaw('min(date(upcoming.due_on))')
+            ->where($this->qualifyColumn('kind'), RecurringKind::Flex)
+            ->whereDate('upcoming.due_on', '>', $today->toDateString());
+
+        $subqueries = collect([$unpaid, $currentPeriod, $nextPeriod]);
+
+        return [
+            'coalesce('.$subqueries->map(fn (Builder $subquery): string => "({$subquery->toSql()})")->implode(', ').')',
+            $subqueries->flatMap(fn (Builder $subquery): array => $subquery->getBindings())->all(),
+        ];
     }
 }

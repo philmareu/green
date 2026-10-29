@@ -11,6 +11,7 @@ use App\Filament\Resources\Accounts\RelationManagers\RecurringsRelationManager;
 use App\Filament\Resources\Recurrings\Pages\CreateRecurring;
 use App\Filament\Resources\Recurrings\Pages\ListRecurrings;
 use App\Filament\Resources\Recurrings\Pages\ViewRecurring;
+use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Filament\Resources\Recurrings\RelationManagers\OccurrencesRelationManager;
 use App\Filament\Resources\Transactions\Pages\ListTransactions;
 use App\Models\Account;
@@ -74,6 +75,41 @@ it('leaves the account unlinked when a recurring item has none', function () {
 
     Livewire::test(ViewRecurring::class, ['record' => $orphan->getRouteKey()])
         ->assertSchemaComponentExists('account.name', 'infolist', linksTo(null));
+});
+
+it('lists the soonest due first and items with nothing due last, and sorts latest due first', function () {
+    $this->travelTo('2026-10-01');
+    $rent = Recurring::factory()->for($this->account)->create(['name' => 'Rent', 'starts_on' => '2026-10-15']);
+    $comcast = Recurring::factory()->for($this->account)->create(['name' => 'Comcast', 'starts_on' => '2026-10-25']);
+    $laptop = Recurring::factory()->for($this->account)->create(['name' => 'Laptop', 'frequency' => Frequency::Once, 'starts_on' => '2026-10-12']);
+    $laptop->occurrences()->sole()->update(['resolution' => OccurrenceResolution::Paid]);
+    $this->travelTo('2026-10-21 12:00');
+
+    Livewire::test(ListRecurrings::class)
+        ->assertCanSeeTableRecords([$rent, $comcast, $laptop], inOrder: true)
+        ->sortTable('next', 'desc')
+        ->assertCanSeeTableRecords([$comcast, $rent, $laptop], inOrder: true);
+});
+
+it('badges Recurring with how many of your items are overdue', function () {
+    $this->travelTo('2026-10-01');
+    Recurring::factory()->for($this->account)->create(['frequency' => Frequency::Weekly, 'starts_on' => '2026-10-08']);
+    Recurring::factory()->for($this->account)->income()->create(['starts_on' => '2026-10-20']);
+    Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-25']);
+    Recurring::factory()->for($this->account)->flex(Category::factory()->create())->create(['starts_on' => '2026-10-01']);
+    Recurring::factory()->create(['starts_on' => '2026-10-15']);
+    $this->travelTo('2026-10-21 12:00');
+
+    expect(RecurringResource::getNavigationBadge())->toBe('2');
+});
+
+it('hides the Recurring badge when nothing is overdue', function () {
+    $this->travelTo('2026-10-01');
+    $rent = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-15']);
+    $rent->occurrences()->whereDate('due_on', '2026-10-15')->sole()->update(['resolution' => OccurrenceResolution::Paid]);
+    $this->travelTo('2026-10-21 12:00');
+
+    expect(RecurringResource::getNavigationBadge())->toBeNull();
 });
 
 it('creates a bill on your account and links its earlier payments', function () {

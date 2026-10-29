@@ -46,7 +46,8 @@ class RecurringsTable
                     ->date('M j, Y')
                     ->description(fn (Recurring $record): ?string => $record->nextOccurrence()?->status()->getLabel())
                     ->color(fn (Recurring $record): ?string => $record->nextOccurrence()?->status()->getColor())
-                    ->placeholder('Nothing due'),
+                    ->placeholder('Nothing due')
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByNextDue($direction)),
                 TextColumn::make('latest')
                     ->label('Latest')
                     ->state(fn (Recurring $record): ?string => static::latest($record))
@@ -66,7 +67,7 @@ class RecurringsTable
                         ->all())
                     ->visible(! $withinAccount),
             ])
-            ->defaultSort('name')
+            ->defaultSort('next')
             ->recordUrl(fn (Recurring $record): string => RecurringResource::getUrl('view', ['record' => $record]))
             ->recordActions([
                 EditAction::make()->iconButton(),

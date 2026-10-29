@@ -248,6 +248,32 @@ it('shows only the account’s own recurring items', function () {
         ->assertCanNotSeeTableRecords([$elsewhere]);
 });
 
+it('lists the account’s soonest due recurring items first', function () {
+    $this->travelTo('2026-10-01');
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $comcast = Recurring::factory()->for($account)->create(['name' => 'Comcast', 'starts_on' => '2026-10-25']);
+    $rent = Recurring::factory()->for($account)->create(['name' => 'Rent', 'starts_on' => '2026-10-15']);
+    $this->travelTo('2026-10-21 12:00');
+
+    Livewire::test(RecurringsRelationManager::class, ['ownerRecord' => $account, 'pageClass' => ViewAccount::class])
+        ->assertCanSeeTableRecords([$rent, $comcast], inOrder: true);
+});
+
+it('badges the Recurring tab with how many of the account’s items are overdue', function () {
+    $this->travelTo('2026-10-01');
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $sibling = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    $quiet = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    Recurring::factory()->for($account)->create(['starts_on' => '2026-10-15']);
+    Recurring::factory()->for($account)->create(['starts_on' => '2026-10-25']);
+    Recurring::factory()->for($sibling)->create(['starts_on' => '2026-10-15']);
+    Recurring::factory()->for($quiet)->create(['starts_on' => '2026-10-25']);
+    $this->travelTo('2026-10-21 12:00');
+
+    expect(RecurringsRelationManager::getBadge($account, ViewAccount::class))->toBe('1')
+        ->and(RecurringsRelationManager::getBadge($quiet, ViewAccount::class))->toBeNull();
+});
+
 it('adds a bill from the account page without picking the account, and links its earlier payment', function () {
     $this->travelTo('2026-10-21 12:00');
     $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
