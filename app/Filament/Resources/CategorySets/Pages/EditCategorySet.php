@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CategorySets\Pages;
 
+use App\Filament\Actions\PageActions;
 use App\Filament\Resources\CategorySets\CategorySetResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -15,8 +16,10 @@ class EditCategorySet extends EditRecord
     {
         return [
             ViewAction::make(),
-            DeleteAction::make()
-                ->modalDescription('The set and all of its categories are deleted. Books using it are left without categories.'),
+            PageActions::group([
+                DeleteAction::make()
+                    ->modalDescription('The set and all of its categories are deleted. Books using it are left without categories.'),
+            ]),
         ];
     }
 

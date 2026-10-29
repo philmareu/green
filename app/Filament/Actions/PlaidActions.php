@@ -59,7 +59,8 @@ class PlaidActions
     }
 
     /**
-     * Fetch real-time balances from the bank. Billed per call in production.
+     * Fetch real-time balances from the bank. Plaid bills each call in
+     * production, so it asks first.
      */
     public static function refreshLiveBalance(): Action
     {
@@ -68,6 +69,11 @@ class PlaidActions
             ->icon(Heroicon::OutlinedBolt)
             ->color('gray')
             ->tooltip('Fetch the balance straight from the bank. Plaid bills this per call in production.')
+            ->requiresConfirmation()
+            ->modalIconColor('warning')
+            ->modalHeading('Fetch a live balance?')
+            ->modalDescription('Green will ask the bank for this account’s balance right now. In production, Plaid bills every live balance request: about $0.10 each on pay-as-you-go pricing, and your plan may differ. The hourly sync updates balances too, with no per-request charge, though they can lag behind the bank.')
+            ->modalSubmitActionLabel('Fetch balance')
             ->action(function (Account $record, RefreshLiveBalances $refresh, Component $livewire): void {
                 try {
                     $refresh->handle($record->plaidItem, [$record->plaid_account_id]);

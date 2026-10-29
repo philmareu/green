@@ -19,7 +19,10 @@ use App\Models\PlaidItem;
 use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\Testing\TestAction;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
@@ -146,6 +149,32 @@ it('refreshes a live balance', function () {
         ->assertNotified('Balance updated');
 
     expect((float) $account->fresh()->available_balance)->toBe(321.5);
+});
+
+it('warns that Plaid bills a live balance and calls Plaid only once confirmed', function () {
+    $account = Account::factory()->for($this->item)->create(['plaid_account_id' => 'acc-checking']);
+    Http::fake([PLAID.'/accounts/balance/get' => Http::response(['accounts' => [plaidAccount()], 'item' => []])]);
+    $page = Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()]);
+
+    $page->mountAction('refreshLiveBalance');
+
+    $page->assertActionMounted('refreshLiveBalance')->assertMountedActionModalSee('Plaid bills every live balance request');
+    Http::assertNothingSent();
+
+    $page->callMountedAction();
+
+    $page->assertNotified('Balance updated');
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => $request->url() === PLAID.'/accounts/balance/get');
+});
+
+it('puts Live balance in the account page’s Actions menu', function () {
+    $account = Account::factory()->for($this->item)->create();
+
+    $headerActions = Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])->instance()->getCachedHeaderActions();
+
+    $actionsMenu = collect($headerActions)->first(fn (Action|ActionGroup $action): bool => $action instanceof ActionGroup && $action->getLabel() === 'Actions');
+    expect($actionsMenu?->getFlatActions())->toHaveKey('refreshLiveBalance');
 });
 
 it('shows only the account’s own recurring items', function () {
