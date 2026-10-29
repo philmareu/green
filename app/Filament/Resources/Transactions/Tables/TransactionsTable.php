@@ -5,11 +5,15 @@ namespace App\Filament\Resources\Transactions\Tables;
 use App\Enums\CategorySource;
 use App\Enums\MatchSource;
 use App\Enums\RecurringKind;
+use App\Filament\Resources\Accounts\AccountResource;
+use App\Filament\Resources\Books\BookResource;
+use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Filament\Resources\Recurrings\Schemas\RecurringForm;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Category;
 use App\Models\CategorySet;
+use App\Models\Occurrence;
 use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Services\Categories\CategorizeTransactions;
@@ -27,8 +31,12 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+
+use function Filament\Support\generate_href_html;
 
 class TransactionsTable
 {
@@ -112,8 +120,8 @@ class TransactionsTable
             TextColumn::make('name')
                 ->label('Description')
                 ->state(fn (Transaction $record): string => $record->description)
-                ->description(fn (Transaction $record): ?string => match (true) {
-                    $record->occurrence?->recurring !== null => "↻ {$record->occurrence->recurring->name} · due {$record->occurrence->due_on->format('M j')}",
+                ->description(fn (Transaction $record): string|Htmlable|null => match (true) {
+                    $record->occurrence?->recurring !== null => static::recurringDescription($record->occurrence),
                     filled($record->category_primary) => Str::headline(Str::lower($record->category_primary)),
                     default => null,
                 })
@@ -132,10 +140,14 @@ class TransactionsTable
                 ->badge()
                 ->color(fn (Transaction $record) => $record->account?->book?->kind?->getColor() ?? 'gray')
                 ->placeholder('Unassigned')
+                ->url(fn (Transaction $record): ?string => $record->account?->book
+                    ? BookResource::getUrl('view', ['record' => $record->account->book])
+                    : null)
                 ->visible(! ($withinBook || $withinAccount)),
             TextColumn::make('account.name')
                 ->label('Account')
                 ->formatStateUsing(fn (Transaction $record): string => $record->account->display_name)
+                ->url(fn (Transaction $record): string => AccountResource::getUrl('view', ['record' => $record->account]))
                 ->toggleable()
                 ->visible(! $withinAccount),
             TextColumn::make('amount')
@@ -145,6 +157,20 @@ class TransactionsTable
                 ->weight('medium')
                 ->alignEnd(),
         ];
+    }
+
+    /**
+     * "↻ Comcast · due Oct 15", with the name linking to the recurring item
+     * the transaction pays.
+     */
+    protected static function recurringDescription(Occurrence $occurrence): Htmlable
+    {
+        return new HtmlString(sprintf(
+            '↻ <a %s style="text-decoration: underline; text-underline-offset: 2px;">%s</a> · due %s',
+            generate_href_html(RecurringResource::getUrl('view', ['record' => $occurrence->recurring]))->toHtml(),
+            e($occurrence->recurring->name),
+            e($occurrence->due_on->format('M j')),
+        ));
     }
 
     /**

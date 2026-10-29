@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Books\Tables;
 
+use App\Filament\Resources\CategorySets\CategorySetResource;
 use App\Models\Book;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
@@ -25,6 +26,9 @@ class BooksTable
                 TextColumn::make('categorySet.name')
                     ->label('Categories')
                     ->placeholder('None')
+                    ->url(fn (Book $record): ?string => $record->categorySet
+                        ? CategorySetResource::getUrl('view', ['record' => $record->categorySet])
+                        : null)
                     ->toggleable(),
                 TextColumn::make('accounts_count')
                     ->label('Accounts')

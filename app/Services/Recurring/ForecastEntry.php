@@ -17,6 +17,7 @@ final readonly class ForecastEntry
         public float $amount,
         public float $balance,
         public int $occurrenceId,
+        public int $recurringId,
         public bool $isOneTime,
         public ?string $note = null,
     ) {}

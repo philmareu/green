@@ -135,6 +135,7 @@ class ForecastBalance
             'kind' => $recurring->kind,
             'amount' => $recurring->kind->isOutflow() ? -$amount : $amount,
             'occurrenceId' => $occurrence->getKey(),
+            'recurringId' => $recurring->getKey(),
             'isOneTime' => $recurring->frequency === Frequency::Once,
             'note' => $note,
         ];

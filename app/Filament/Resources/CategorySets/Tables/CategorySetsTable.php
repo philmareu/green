@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\CategorySets\Tables;
 
+use App\Filament\Resources\Books\BookResource;
+use App\Models\Book;
 use App\Services\Categories\StarterCategories;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -31,6 +33,7 @@ class CategorySetsTable
                 TextColumn::make('books.name')
                     ->label('Used by')
                     ->badge()
+                    ->url(fn (Book $relatedRecord): string => BookResource::getUrl('view', ['record' => $relatedRecord]))
                     ->placeholder('No Books'),
             ])
             ->defaultSort('name')

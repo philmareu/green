@@ -5,6 +5,9 @@ use App\Enums\Frequency;
 use App\Enums\MatchSource;
 use App\Enums\OccurrenceResolution;
 use App\Enums\RecurringKind;
+use App\Filament\Resources\Accounts\AccountResource;
+use App\Filament\Resources\Accounts\Pages\ViewAccount;
+use App\Filament\Resources\Accounts\RelationManagers\RecurringsRelationManager;
 use App\Filament\Resources\Recurrings\Pages\CreateRecurring;
 use App\Filament\Resources\Recurrings\Pages\ListRecurrings;
 use App\Filament\Resources\Recurrings\Pages\ViewRecurring;
@@ -47,6 +50,30 @@ it('lists only your recurring items', function () {
         ->assertCanNotSeeTableRecords([$theirs]);
 
     Livewire::test(ViewRecurring::class, ['record' => $theirs->getRouteKey()])->assertNotFound();
+});
+
+it('links a recurring item to its account, except on the account’s own page', function () {
+    $comcast = Recurring::factory()->for($this->account)->create();
+    $accountUrl = AccountResource::getUrl('view', ['record' => $this->account]);
+
+    Livewire::test(ListRecurrings::class)
+        ->assertTableColumnExists('account.name', linksTo($accountUrl), $comcast);
+
+    Livewire::test(ViewRecurring::class, ['record' => $comcast->getRouteKey()])
+        ->assertSchemaComponentExists('account.name', 'infolist', linksTo($accountUrl));
+
+    Livewire::test(RecurringsRelationManager::class, ['ownerRecord' => $this->account, 'pageClass' => ViewAccount::class])
+        ->assertTableColumnHidden('account.name');
+});
+
+it('leaves the account unlinked when a recurring item has none', function () {
+    $orphan = Recurring::factory()->for($this->user)->create(['account_id' => null]);
+
+    Livewire::test(ListRecurrings::class)
+        ->assertTableColumnExists('account.name', linksTo(null), $orphan);
+
+    Livewire::test(ViewRecurring::class, ['record' => $orphan->getRouteKey()])
+        ->assertSchemaComponentExists('account.name', 'infolist', linksTo(null));
 });
 
 it('creates a bill on your account and links its earlier payments', function () {

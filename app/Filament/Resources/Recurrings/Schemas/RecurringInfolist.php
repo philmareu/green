@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Recurrings\Schemas;
 
 use App\Enums\RecurringKind;
+use App\Filament\Resources\Accounts\AccountResource;
 use App\Models\Recurring;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -30,6 +31,9 @@ class RecurringInfolist
                         TextEntry::make('account.name')
                             ->label('Account')
                             ->state(fn (Recurring $record): ?string => $record->account?->display_name)
+                            ->url(fn (Recurring $record): ?string => $record->account
+                                ? AccountResource::getUrl('view', ['record' => $record->account])
+                                : null)
                             ->placeholder('Needs an account'),
                         TextEntry::make('starts_on')
                             ->label(fn (Recurring $record): string => $isFlex($record) ? 'First period' : 'First due')

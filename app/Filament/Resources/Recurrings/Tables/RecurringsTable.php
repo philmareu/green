@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Recurrings\Tables;
 
 use App\Enums\RecurringKind;
 use App\Filament\Actions\RecurringActions;
+use App\Filament\Resources\Accounts\AccountResource;
 use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Models\Account;
 use App\Models\Recurring;
@@ -22,10 +23,17 @@ class RecurringsTable
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['account', 'category', 'occurrences.transaction']))
             ->columns([
                 TextColumn::make('name')
-                    ->description(fn (Recurring $record): ?string => $withinAccount ? null : ($record->account?->display_name ?? 'Needs an account'))
                     ->weight('medium')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('account.name')
+                    ->label('Account')
+                    ->formatStateUsing(fn (Recurring $record): string => $record->account->display_name)
+                    ->url(fn (Recurring $record): ?string => $record->account
+                        ? AccountResource::getUrl('view', ['record' => $record->account])
+                        : null)
+                    ->placeholder('Needs an account')
+                    ->visible(! $withinAccount),
                 TextColumn::make('kind')
                     ->badge(),
                 TextColumn::make('amount')

@@ -12,6 +12,7 @@ use App\Filament\Resources\Accounts\RelationManagers\TransactionsRelationManager
 use App\Filament\Resources\Books\BookResource;
 use App\Filament\Resources\Books\Pages\ViewBook;
 use App\Filament\Resources\Books\RelationManagers\AccountsRelationManager;
+use App\Filament\Resources\PlaidItems\PlaidItemResource;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Category;
@@ -140,6 +141,21 @@ it('counts each account’s recurring items, not someone else’s, and links to 
     Livewire::withQueryParams(['relation' => 'recurring'])
         ->test(ViewAccount::class, ['record' => $account->getRouteKey()])
         ->assertSet('activeRelationManager', 'recurring');
+});
+
+it('links an account to its Book and its bank connection', function () {
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+
+    Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertSchemaComponentExists('book.name', 'infolist', linksTo(BookResource::getUrl('view', ['record' => $this->book])))
+        ->assertSchemaComponentExists('plaidItem.institution_name', 'infolist', linksTo(PlaidItemResource::getUrl(parameters: ['search' => $this->item->institution_name])));
+});
+
+it('leaves an unassigned account’s Book unlinked', function () {
+    $account = Account::factory()->for($this->item)->create(['book_id' => null]);
+
+    Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertSchemaComponentExists('book.name', 'infolist', linksTo(null));
 });
 
 it('shows an account with only its own transactions', function () {
