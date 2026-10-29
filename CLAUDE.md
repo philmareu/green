@@ -18,6 +18,7 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - `SyncPlaidItem` uses `/transactions/sync`: pages are applied as they arrive (idempotent upserts and deletes), the cursor is saved only after `has_more` is false, and a posted transaction deletes its pending predecessor via `pending_transaction_id`.
 - `LinkPlaidItem` exchanges a Link public token; `app/Filament/Pages/LinkBank.php` runs Link (`?book=` to add, `?item=` for update mode, `/plaid/oauth` return route in `routes/web.php`).
 - Plaid errors become `PlaidException`; sync failures are recorded on the item (`status`, `error_code`, `error_message`) rather than thrown.
+- `app/Services/Plaid/PlaidLogger.php` writes a `plaid_logs` row (Plaid Activity page, scoped by `user_id`) per sync, Live balance, link and removal, with each request's endpoint and `request_id` from `PlaidClient`; never tokens or transaction details. Write failures are reported, not thrown; the daily `model:prune` deletes rows after 14 days.
 
 ## Commands
 

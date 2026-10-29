@@ -21,6 +21,13 @@ class PlaidClient
     public const string API_VERSION = '2020-09-14';
 
     /**
+     * Requests made while a capture is open, one list per open capture.
+     *
+     * @var list<list<array{endpoint: string, status: ?int, request_id: ?string, error_code: ?string}>>
+     */
+    private array $captures = [];
+
+    /**
      * @param  array<string, mixed>  $config  The `services.plaid` config array.
      */
     public function __construct(private readonly array $config) {}
@@ -177,6 +184,25 @@ class PlaidClient
     }
 
     /**
+     * Start noting each request's endpoint, status, Plaid request id and
+     * error code (never its body) until `stopCapturing()`.
+     */
+    public function startCapturing(): void
+    {
+        $this->captures[] = [];
+    }
+
+    /**
+     * End the latest capture.
+     *
+     * @return list<array{endpoint: string, status: ?int, request_id: ?string, error_code: ?string}>
+     */
+    public function stopCapturing(): array
+    {
+        return array_pop($this->captures) ?? [];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
@@ -189,14 +215,36 @@ class PlaidClient
         try {
             $response = $this->http()->post($endpoint, $payload);
         } catch (ConnectionException $e) {
-            throw PlaidException::connectionFailed($e);
+            $exception = PlaidException::connectionFailed($e);
+            $this->capture($endpoint, null, null, $exception->errorCode);
+
+            throw $exception;
         }
+
+        $this->capture(
+            $endpoint,
+            $response->status(),
+            $response->json('request_id'),
+            $response->failed() ? $response->json('error_code') : null,
+        );
 
         if ($response->failed()) {
             throw PlaidException::fromResponse($response);
         }
 
         return $response->json();
+    }
+
+    protected function capture(string $endpoint, ?int $status, mixed $requestId, mixed $errorCode): void
+    {
+        foreach (array_keys($this->captures) as $index) {
+            $this->captures[$index][] = [
+                'endpoint' => $endpoint,
+                'status' => $status,
+                'request_id' => is_string($requestId) ? $requestId : null,
+                'error_code' => is_string($errorCode) ? $errorCode : null,
+            ];
+        }
     }
 
     protected function http(): PendingRequest

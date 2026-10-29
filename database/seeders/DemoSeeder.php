@@ -9,6 +9,7 @@ use App\Models\Account;
 use App\Models\Book;
 use App\Models\Category;
 use App\Models\PlaidItem;
+use App\Models\PlaidLog;
 use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Models\User;
@@ -109,6 +110,21 @@ class DemoSeeder extends Seeder
         app(CategorizeTransactions::class)->handle(Transaction::query()->ownedBy($user));
 
         $this->recurring($user, $businessChecking, $personalChecking);
+        $this->plaidActivity($bank, $card);
+    }
+
+    /**
+     * A day of hourly syncs, a Live balance refresh, and the failed sync that
+     * left the card needing a reconnect.
+     */
+    private function plaidActivity(PlaidItem $bank, PlaidItem $card): void
+    {
+        foreach (range(1, 24) as $hoursAgo) {
+            PlaidLog::factory()->for($bank)->create(['started_at' => now()->subHours($hoursAgo)->startOfHour()->addSeconds(4)]);
+        }
+
+        PlaidLog::factory()->for($bank)->liveBalance()->create(['started_at' => now()->subMinutes(40)]);
+        PlaidLog::factory()->for($card)->failed()->create(['started_at' => $card->last_synced_at->addHour()]);
     }
 
     /**

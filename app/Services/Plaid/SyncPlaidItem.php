@@ -4,7 +4,10 @@ namespace App\Services\Plaid;
 
 use App\Enums\CategorySource;
 use App\Enums\PlaidItemStatus;
+use App\Enums\PlaidLogKind;
+use App\Enums\PlaidLogTrigger;
 use App\Models\PlaidItem;
+use App\Models\PlaidLog;
 use App\Models\Transaction;
 use App\Services\Categories\CategorizeTransactions;
 use App\Services\Recurring\MatchRecurringTransactions;
@@ -32,12 +35,22 @@ class SyncPlaidItem
         private readonly UpsertAccounts $upsertAccounts,
         private readonly CategorizeTransactions $categorize,
         private readonly MatchRecurringTransactions $matchRecurring,
+        private readonly PlaidLogger $logger,
     ) {}
 
-    public function handle(PlaidItem $item): SyncResult
+    /**
+     * @param  PlaidLogTrigger  $trigger  What started the sync, for the Plaid activity log.
+     */
+    public function handle(PlaidItem $item, PlaidLogTrigger $trigger = PlaidLogTrigger::Manual): SyncResult
     {
         try {
-            $result = $this->pull($item);
+            $result = $this->logger->record(PlaidLogKind::Sync, $item, function (PlaidLog $log) use ($item): SyncResult {
+                $result = $this->pull($item);
+
+                $log->fill(['added' => $result->added, 'modified' => $result->modified, 'removed' => $result->removed]);
+
+                return $result;
+            }, trigger: $trigger);
         } catch (PlaidException $e) {
             $this->recordFailure($item, $e);
 

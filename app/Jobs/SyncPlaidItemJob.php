@@ -2,12 +2,16 @@
 
 namespace App\Jobs;
 
+use App\Enums\PlaidLogTrigger;
 use App\Models\PlaidItem;
 use App\Services\Plaid\SyncPlaidItem;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
+/**
+ * Queued by `plaid:sync`, which the scheduler runs hourly.
+ */
 class SyncPlaidItemJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
@@ -26,6 +30,6 @@ class SyncPlaidItemJob implements ShouldBeUnique, ShouldQueue
     public function handle(SyncPlaidItem $sync): void
     {
         // Plaid errors are recorded on the item rather than failing the job.
-        $sync->handle($this->item);
+        $sync->handle($this->item, PlaidLogTrigger::Scheduled);
     }
 }
