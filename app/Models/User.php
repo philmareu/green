@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\NotificationType;
 use Database\Factories\UserFactory;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
@@ -34,6 +35,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'notification_preferences' => 'array',
         ];
     }
 
@@ -59,6 +61,16 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function recurrings(): HasMany
     {
         return $this->hasMany(Recurring::class);
+    }
+
+    /**
+     * Where this user gets a kind of notification. Empty means it's turned off.
+     *
+     * @return list<string>
+     */
+    public function notificationChannels(NotificationType $type): array
+    {
+        return $this->notification_preferences[$type->value] ?? $type->defaultChannels();
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Models\PlaidItem;
 use App\Models\PlaidLog;
 use App\Models\Transaction;
 use App\Services\Categories\CategorizeTransactions;
+use App\Services\Notifications\NotifyNegativeBalances;
 use App\Services\Recurring\MatchRecurringTransactions;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -36,6 +37,7 @@ class SyncPlaidItem
         private readonly CategorizeTransactions $categorize,
         private readonly MatchRecurringTransactions $matchRecurring,
         private readonly PlaidLogger $logger,
+        private readonly NotifyNegativeBalances $notifyNegativeBalances,
     ) {}
 
     /**
@@ -120,6 +122,12 @@ class SyncPlaidItem
         // After the cursor is saved, so a matching bug can't stop syncing.
         try {
             $this->matchRecurring->forAccounts($item->accounts()->pluck('id'));
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        try {
+            $this->notifyNegativeBalances->forItem($item);
         } catch (Throwable $e) {
             report($e);
         }

@@ -51,6 +51,7 @@ class Account extends Model
             'available_balance' => 'decimal:4',
             'credit_limit' => 'decimal:4',
             'balances_updated_at' => 'datetime',
+            'negative_notified_at' => 'datetime',
             'is_hidden' => 'boolean',
         ];
     }
