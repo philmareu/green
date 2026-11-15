@@ -18,7 +18,7 @@ it('shows the default channels until the user saves their own', function () {
     $this->actingAs(User::factory()->create());
 
     Livewire::test(NotificationPreferences::class)
-        ->assertFormSet(['negative_balance' => ['database'], 'reminder' => ['database']]);
+        ->assertFormSet(['negative_balance' => ['database'], 'reminder' => ['database'], 'budget_alert' => ['database']]);
 });
 
 it('saves the choices for the signed-in user only', function () {
@@ -32,7 +32,7 @@ it('saves the choices for the signed-in user only', function () {
         ->assertHasNoFormErrors()
         ->assertNotified('Saved');
 
-    expect($user->refresh()->notification_preferences)->toBe(['negative_balance' => ['database', 'mail'], 'reminder' => ['database']])
+    expect($user->refresh()->notification_preferences)->toBe(['negative_balance' => ['database', 'mail'], 'reminder' => ['database'], 'budget_alert' => ['database']])
         ->and($someoneElse->refresh()->notification_preferences)->toBeNull();
 });
 
@@ -44,7 +44,7 @@ it('lets the user turn a notification off', function () {
         ->fillForm(['negative_balance' => []])
         ->call('save');
 
-    expect($user->refresh()->notification_preferences)->toBe(['negative_balance' => [], 'reminder' => ['database']]);
+    expect($user->refresh()->notification_preferences)->toBe(['negative_balance' => [], 'reminder' => ['database'], 'budget_alert' => ['database']]);
 });
 
 it('rejects a channel that does not exist', function () {

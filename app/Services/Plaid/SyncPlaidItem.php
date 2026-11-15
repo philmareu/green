@@ -10,6 +10,7 @@ use App\Models\PlaidItem;
 use App\Models\PlaidLog;
 use App\Models\Transaction;
 use App\Services\Categories\CategorizeTransactions;
+use App\Services\Notifications\NotifyBudgetAlerts;
 use App\Services\Notifications\NotifyNegativeBalances;
 use App\Services\Recurring\MatchRecurringTransactions;
 use Illuminate\Support\Arr;
@@ -38,6 +39,7 @@ class SyncPlaidItem
         private readonly MatchRecurringTransactions $matchRecurring,
         private readonly PlaidLogger $logger,
         private readonly NotifyNegativeBalances $notifyNegativeBalances,
+        private readonly NotifyBudgetAlerts $notifyBudgetAlerts,
     ) {}
 
     /**
@@ -128,6 +130,12 @@ class SyncPlaidItem
 
         try {
             $this->notifyNegativeBalances->forItem($item);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        try {
+            $this->notifyBudgetAlerts->forAccounts($item->accounts()->pluck('id'));
         } catch (Throwable $e) {
             report($e);
         }

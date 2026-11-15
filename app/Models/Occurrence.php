@@ -25,7 +25,7 @@ use Illuminate\Support\Collection;
  * can be postponed: `due_on` stays the scheduled date, and `postponed_to` is
  * when it's expected instead (`expectedOn()`).
  */
-#[Fillable(['recurring_id', 'due_on', 'postponed_to', 'transaction_id', 'matched_by', 'resolution'])]
+#[Fillable(['recurring_id', 'due_on', 'postponed_to', 'transaction_id', 'matched_by', 'resolution', 'budget_alert'])]
 class Occurrence extends Model
 {
     /** @use HasFactory<OccurrenceFactory> */
@@ -65,6 +65,7 @@ class Occurrence extends Model
             'postponed_to' => 'immutable_date',
             'matched_by' => MatchSource::class,
             'resolution' => OccurrenceResolution::class,
+            'budget_alert' => 'integer',
         ];
     }
 
@@ -138,11 +139,35 @@ class Occurrence extends Model
     }
 
     /**
+     * A flex spend's budget for this period.
+     */
+    public function budget(): float
+    {
+        return (float) $this->recurring->amount;
+    }
+
+    /**
      * What a flex spend has left this period.
      */
     public function left(): float
     {
-        return max(0.0, round((float) $this->recurring->amount - $this->spent(), 2));
+        return max(0.0, round($this->budget() - $this->spent(), 2));
+    }
+
+    /**
+     * The budget alert this period's spending calls for: 100 once it's over
+     * the budget, `Recurring::BUDGET_WARNING_PERCENT` once it's close.
+     */
+    public function budgetAlertLevel(float $spent): ?int
+    {
+        $budget = $this->budget();
+
+        return match (true) {
+            $budget <= 0 => null,
+            $spent > $budget => 100,
+            $spent >= round($budget * Recurring::BUDGET_WARNING_PERCENT / 100, 2) => Recurring::BUDGET_WARNING_PERCENT,
+            default => null,
+        };
     }
 
     /**
