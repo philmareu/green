@@ -45,6 +45,10 @@ class RecurringInfolist
                             ->badge()
                             ->color(fn (Recurring $record): string => $record->autopay ? 'gray' : 'warning')
                             ->visible(fn (Recurring $record): bool => $record->kind === RecurringKind::Bill),
+                        TextEntry::make('rolls_over')
+                            ->label('Rollover')
+                            ->state(fn (Recurring $record): string => $record->rolls_over ? 'Rolls over' : 'Resets each period')
+                            ->visible($isFlex),
                         TextEntry::make('payee')
                             ->label('Payee contains')
                             ->placeholder('Not set: link payments yourself')

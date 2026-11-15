@@ -98,6 +98,11 @@ class RecurringForm
                 ->helperText('Off means you pay it yourself, and the lists flag it so it doesn’t slip.')
                 ->visible(fn (Get $get): bool => $get->enum('kind', RecurringKind::class, isNullable: true) === RecurringKind::Bill)
                 ->columnSpanFull(),
+            Toggle::make('rolls_over')
+                ->label('Roll over')
+                ->helperText('What’s left of a period adds to the next period’s budget, and overspending takes from it.')
+                ->visible($isFlex)
+                ->columnSpanFull(),
             Section::make('Matching')
                 ->description('How Green finds the transaction that paid it.')
                 ->columns(2)

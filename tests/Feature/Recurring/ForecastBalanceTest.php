@@ -113,3 +113,30 @@ it('counts a postponed bill on its new date, and as overdue once that date passe
             ['2026-10-21', 'Rent', -900.0, 100.0],
         ]);
 });
+
+it('reserves what rolled over into this period, and takes overspending out of the next', function () {
+    $this->travelTo('2026-10-01');
+    $groceries = Category::factory()->create(['name' => 'Groceries']);
+    $dining = Category::factory()->create(['name' => 'Dining']);
+    Recurring::factory()->for($this->account)->flex($groceries)->create(['amount' => 100, 'starts_on' => '2026-10-12', 'rolls_over' => true]);
+    Recurring::factory()->for($this->account)->flex($dining)->create(['amount' => 50, 'starts_on' => '2026-10-12', 'rolls_over' => true]);
+    $spend = fn (Category $category, float $amount, string $date) => Transaction::factory()->for($this->account)
+        ->create(['amount' => $amount, 'category_id' => $category->id, 'date' => $date, 'authorized_date' => $date]);
+    $spend($groceries, 40.00, '2026-10-13');
+    $spend($groceries, 200.00, '2026-10-20');
+    $spend($dining, 20.00, '2026-10-13');
+    $spend($dining, 10.00, '2026-10-20');
+    $this->travelTo('2026-10-21');
+
+    $forecast = forecast($this->account, '2026-11-08');
+
+    expect(register($forecast))->toBe([
+        ['2026-10-21', 'Dining', -70.0, 930.0],
+        ['2026-10-26', 'Groceries', -60.0, 870.0],
+        ['2026-10-26', 'Dining', -50.0, 820.0],
+        ['2026-11-02', 'Groceries', -100.0, 720.0],
+        ['2026-11-02', 'Dining', -50.0, 670.0],
+    ])
+        ->and($forecast->entries[0]->note)->toBe('$10.00 of $80.00 spent so far')
+        ->and($forecast->entries[1]->note)->toBe('Budget until Nov 1, less $40.00 overspent');
+});

@@ -284,3 +284,17 @@ it('flags the bills you pay by hand and filters to them', function () {
         ->assertCanSeeTableRecords([$byHand])
         ->assertCanNotSeeTableRecords([$autopay, $income]);
 });
+
+it('shows each period’s budget with what rolled over when a flex spend rolls over', function () {
+    $this->travelTo('2026-10-01 12:00');
+    $category = Category::factory()->create(['name' => 'Groceries']);
+    $groceries = Recurring::factory()->for($this->account)->flex($category)->create(['amount' => 100, 'starts_on' => '2026-10-12', 'rolls_over' => true]);
+    Transaction::factory()->for($this->account)->create(['amount' => 70, 'category_id' => $category->id, 'date' => '2026-10-13', 'authorized_date' => '2026-10-13']);
+    $this->travelTo('2026-10-21 12:00');
+
+    $thisWeek = $groceries->occurrences()->whereDate('due_on', '2026-10-19')->sole();
+
+    Livewire::test(OccurrencesRelationManager::class, ['ownerRecord' => $groceries, 'pageClass' => ViewRecurring::class])
+        ->assertTableColumnStateSet('budget', 130.0, $thisWeek)
+        ->assertTableColumnHasDescription('budget', '+$30.00 rolled over', $thisWeek);
+});

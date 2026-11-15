@@ -108,7 +108,7 @@ class RecurringsTable
             $current = $record->nextOccurrence();
 
             return $current?->due_on->lte(today())
-                ? Number::currency($current->spent(), $currency).' of '.Number::currency((float) $record->amount, $currency).' spent'
+                ? Number::currency($current->spent(), $currency).' of '.Number::currency($current->budget(), $currency).' spent'
                 : null;
         }
 

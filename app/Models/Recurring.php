@@ -29,7 +29,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * counts. `amount` is always positive; `kind` gives the direction. A bill's or
  * income's `category` goes on the transactions linked to it; a flex spend's is
  * the category its budget counts. A bill's `autopay` says it's paid
- * automatically; without it you pay by hand, and the lists flag it.
+ * automatically; without it you pay by hand, and the lists flag it. A flex
+ * spend that `rolls_over` carries each period's unspent money or overspending
+ * into the next (`Occurrence::budget()`).
  */
 #[Fillable([
     'user_id',
@@ -43,6 +45,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'payee',
     'amount_tolerance',
     'autopay',
+    'rolls_over',
     'category_id',
     'dismissed_transactions',
 ])]
@@ -92,6 +95,7 @@ class Recurring extends Model
             'ends_on' => 'immutable_date',
             'amount_tolerance' => 'integer',
             'autopay' => 'boolean',
+            'rolls_over' => 'boolean',
             'dismissed_transactions' => 'array',
         ];
     }

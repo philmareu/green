@@ -144,3 +144,17 @@ it('checks budgets after a sync, once transactions are categorized', function ()
 
     Notification::assertSentTo($groceries->user, BudgetAlert::class);
 });
+
+it('alerts that a period is over budget when rolled-over overspending has used up its budget', function () {
+    Notification::fake();
+    $this->travelTo('2026-10-01 12:00');
+    $groceries = groceriesBudget($this->account, $this->groceries, ['amount' => 100, 'starts_on' => '2026-10-12', 'rolls_over' => true]);
+    spendOn($this->account, $this->groceries, 250.00, '2026-10-13');
+    $this->travelTo('2026-10-21 12:00');
+    spendOn($this->account, $this->groceries, 5.00);
+
+    checkBudgets($this->account);
+
+    Notification::assertSentToTimes($groceries->user, BudgetAlert::class, 1);
+    expect($groceries->occurrences()->whereDate('due_on', '2026-10-19')->sole()->budget_alert)->toBe(100);
+});

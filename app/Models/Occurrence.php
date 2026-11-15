@@ -139,11 +139,42 @@ class Occurrence extends Model
     }
 
     /**
-     * A flex spend's budget for this period.
+     * A flex spend's budget for this period: its amount, plus what rolled
+     * over from earlier periods when it rolls over.
      */
     public function budget(): float
     {
-        return (float) $this->recurring->amount;
+        return round((float) $this->recurring->amount + $this->rolledOver(), 2);
+    }
+
+    /**
+     * What earlier periods carry into this one, when the flex spend rolls
+     * over: each tracked earlier period adds its amount and takes away its
+     * spending, so unspent money adds and overspending takes away. Skipped
+     * periods carry nothing. Every period counts the current amount.
+     */
+    public function rolledOver(): float
+    {
+        $recurring = $this->recurring;
+
+        if ($recurring->kind !== RecurringKind::Flex || ! $recurring->rolls_over) {
+            return 0.0;
+        }
+
+        $earlier = $recurring->occurrences()
+            ->whereDate('due_on', '<', $this->due_on->toDateString())
+            ->get()
+            ->each->setRelation('recurring', $recurring);
+
+        if ($earlier->isEmpty()) {
+            return 0.0;
+        }
+
+        $skipped = $earlier->filter(fn (Occurrence $occurrence): bool => $occurrence->resolution === OccurrenceResolution::Skipped);
+        $spent = $recurring->spentBetween($earlier->min('due_on'), $this->due_on)
+            - $skipped->sum(fn (Occurrence $occurrence): float => $occurrence->spent());
+
+        return round(($earlier->count() - $skipped->count()) * (float) $recurring->amount - $spent, 2);
     }
 
     /**
@@ -163,9 +194,8 @@ class Occurrence extends Model
         $budget = $this->budget();
 
         return match (true) {
-            $budget <= 0 => null,
-            $spent > $budget => 100,
-            $spent >= round($budget * Recurring::BUDGET_WARNING_PERCENT / 100, 2) => Recurring::BUDGET_WARNING_PERCENT,
+            $spent > $budget && $spent > 0 => 100,
+            $budget > 0 && $spent >= round($budget * Recurring::BUDGET_WARNING_PERCENT / 100, 2) => Recurring::BUDGET_WARNING_PERCENT,
             default => null,
         };
     }

@@ -38,3 +38,24 @@ it('finds as overdue exactly the due dates whose status is overdue', function ()
         ->and($occurrences->filter(fn (Occurrence $occurrence): bool => $occurrence->status() === OccurrenceStatus::Overdue)->values()->modelKeys())
         ->toEqualCanonicalizing($overdue->modelKeys());
 });
+
+it('rolls unspent money and overspending into later periods, leaving out skipped ones', function (bool $rollsOver, array $budgets) {
+    $this->travelTo('2026-10-01 12:00');
+    $account = Account::factory()->create();
+    $groceries = Category::factory()->create(['name' => 'Groceries']);
+    $weekly = Recurring::factory()->for($account)->flex($groceries)->create(['amount' => 100, 'starts_on' => '2026-10-05', 'rolls_over' => $rollsOver]);
+    $spend = fn (float $amount, string $date) => Transaction::factory()->for($account)
+        ->create(['amount' => $amount, 'category_id' => $groceries->id, 'date' => $date, 'authorized_date' => $date]);
+    $spend(70.00, '2026-10-06');
+    $spend(500.00, '2026-10-13');
+    $spend(160.00, '2026-10-20');
+    $weekly->occurrences()->whereDate('due_on', '2026-10-12')->sole()->update(['resolution' => OccurrenceResolution::Skipped]);
+    $this->travelTo('2026-10-27 12:00');
+
+    expect($weekly->occurrences()->whereDate('due_on', '<=', '2026-10-26')->get()
+        ->mapWithKeys(fn (Occurrence $occurrence): array => [$occurrence->due_on->toDateString() => $occurrence->budget()])
+        ->all())->toBe($budgets);
+})->with([
+    'rolls over' => [true, ['2026-10-05' => 100.0, '2026-10-12' => 130.0, '2026-10-19' => 130.0, '2026-10-26' => 70.0]],
+    'resets each period' => [false, ['2026-10-05' => 100.0, '2026-10-12' => 100.0, '2026-10-19' => 100.0, '2026-10-26' => 100.0]],
+]);

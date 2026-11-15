@@ -60,6 +60,14 @@ class OccurrencesRelationManager extends RelationManager
                     ->placeholder('—')
                     ->wrap()
                     ->visible(! $isFlex),
+                TextColumn::make('budget')
+                    ->state(fn (Occurrence $record): ?float => $record->due_on->lte(today()) ? $record->budget() : null)
+                    ->money($currency)
+                    ->description(fn (Occurrence $record): ?string => ($rolledOver = $record->due_on->lte(today()) ? $record->rolledOver() : 0.0) != 0
+                        ? ($rolledOver > 0 ? '+' : '−').Number::currency(abs($rolledOver), $currency).' rolled over'
+                        : null)
+                    ->placeholder('—')
+                    ->visible($isFlex && $recurring->rolls_over),
                 TextColumn::make('spent')
                     ->state(fn (Occurrence $record): ?float => $record->due_on->lte(today()) ? $record->spent() : null)
                     ->money($currency)
