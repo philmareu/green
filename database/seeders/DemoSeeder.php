@@ -169,7 +169,7 @@ class DemoSeeder extends Seeder
         ];
 
         foreach ($items as [$account, $kind, $name, $amount, $frequency, $startsOn, $attributes]) {
-            Recurring::query()->create([
+            $recurring = Recurring::query()->create([
                 'user_id' => $user->id,
                 'account_id' => $account->id,
                 'kind' => $kind,
@@ -180,6 +180,10 @@ class DemoSeeder extends Seeder
                 'amount_tolerance' => $kind === RecurringKind::Flex ? null : 10,
                 ...$attributes,
             ]);
+
+            if ($name === 'Netflix') {
+                $recurring->reminders()->create(['days_before' => 3, 'repeats' => false, 'note' => 'Cancel before it renews']);
+            }
         }
     }
 

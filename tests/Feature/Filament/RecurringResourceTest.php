@@ -13,6 +13,7 @@ use App\Filament\Resources\Recurrings\Pages\ListRecurrings;
 use App\Filament\Resources\Recurrings\Pages\ViewRecurring;
 use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Filament\Resources\Recurrings\RelationManagers\OccurrencesRelationManager;
+use App\Filament\Resources\Recurrings\RelationManagers\RemindersRelationManager;
 use App\Filament\Resources\Transactions\Pages\ListTransactions;
 use App\Models\Account;
 use App\Models\Book;
@@ -225,4 +226,30 @@ it('postpones a due date to a later date, and restores it', function () {
 
     $dueDates()->callAction(TestAction::make('restoreDueDate')->table($occurrence));
     expect($occurrence->fresh()->postponed_to)->toBeNull();
+});
+
+it('adds a reminder to a bill and shows when it will be sent', function () {
+    $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-25']);
+    $reminders = fn () => Livewire::test(RemindersRelationManager::class, ['ownerRecord' => $comcast, 'pageClass' => ViewRecurring::class]);
+
+    $reminders()->callAction(TestAction::make('create')->table(), data: ['days_before' => 61, 'repeats' => false])
+        ->assertHasFormErrors(['days_before' => 'max']);
+
+    $reminders()->callAction(TestAction::make('create')->table(), data: ['days_before' => 3, 'repeats' => true, 'note' => 'Pay by hand'])
+        ->assertHasNoFormErrors()
+        ->assertSee('3 days before, every due date')
+        ->assertSee('Thu, Oct 22 for Oct 25');
+
+    expect($comcast->reminders()->sole())
+        ->days_before->toBe(3)
+        ->repeats->toBeTrue()
+        ->note->toBe('Pay by hand');
+});
+
+it('offers reminders on bills and income but not on flex spends', function () {
+    $comcast = Recurring::factory()->for($this->account)->create();
+    $groceries = Recurring::factory()->for($this->account)->flex(Category::factory()->create())->create();
+
+    expect(RemindersRelationManager::canViewForRecord($comcast, ViewRecurring::class))->toBeTrue()
+        ->and(RemindersRelationManager::canViewForRecord($groceries, ViewRecurring::class))->toBeFalse();
 });
