@@ -57,6 +57,7 @@ class ForecastRegister extends TableWidget
                     'amount' => $entry->amount,
                     'balance' => $entry->balance,
                     'one_time' => $entry->isOneTime,
+                    'postponed' => $entry->isPostponed,
                 ]])
                 ->all())
             ->columns([
@@ -91,6 +92,12 @@ class ForecastRegister extends TableWidget
                         ->after(fn () => $this->dispatch(self::UPDATED_EVENT)),
                     RecurringActions::markPaid()
                         ->visible(fn (array $record): bool => $record['kind'] !== RecurringKind::Flex->value)
+                        ->after(fn () => $this->dispatch(self::UPDATED_EVENT)),
+                    RecurringActions::postpone()
+                        ->visible(fn (array $record): bool => $record['kind'] !== RecurringKind::Flex->value)
+                        ->after(fn () => $this->dispatch(self::UPDATED_EVENT)),
+                    RecurringActions::restoreDueDate()
+                        ->visible(fn (array $record): bool => $record['postponed'])
                         ->after(fn () => $this->dispatch(self::UPDATED_EVENT)),
                     RecurringActions::skip()
                         ->after(fn () => $this->dispatch(self::UPDATED_EVENT)),

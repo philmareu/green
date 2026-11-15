@@ -80,3 +80,24 @@ it('keeps items with nothing due last when ordered latest first', function () {
 
     expect($names)->toBe(['Insurance', 'Comcast', 'Dining', 'Gifts', 'Groceries', 'Rent', 'Vacation', 'Holiday', 'Laptop']);
 });
+
+it('orders a postponed bill by its new date, or by its next due date once the new date is later', function () {
+    $bill = fn (array $attributes): Recurring => Recurring::factory()->for($this->account)->create($attributes);
+    $postpone = fn (Recurring $recurring, string $dueOn, string $to) => $recurring->occurrences()
+        ->whereDate('due_on', $dueOn)
+        ->sole()
+        ->update(['postponed_to' => $to]);
+    $postpone($bill(['name' => 'Rent', 'starts_on' => '2026-10-15']), '2026-10-15', '2026-11-20');
+    $postpone($bill(['name' => 'Phone', 'starts_on' => '2026-10-12']), '2026-10-12', '2026-10-28');
+    $bill(['name' => 'Comcast', 'starts_on' => '2026-10-25']);
+    $this->travelTo('2026-10-21 12:00');
+
+    $recurrings = Recurring::query()->orderByNextDue()->with('occurrences.transaction')->get();
+
+    expect($recurrings->mapWithKeys(fn (Recurring $recurring): array => [$recurring->name => $recurring->nextOccurrence()->expectedOn()->toDateString()])->all())
+        ->toBe([
+            'Comcast' => '2026-10-25',
+            'Phone' => '2026-10-28',
+            'Rent' => '2026-11-15',
+        ]);
+});

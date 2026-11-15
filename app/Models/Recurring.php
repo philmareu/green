@@ -115,8 +115,9 @@ class Recurring extends Model
     }
 
     /**
-     * The due date to watch: the earliest unpaid one (overdue ones first) or,
-     * for a flex spend, the current period.
+     * The due date to watch: the unpaid one expected soonest (overdue ones
+     * first, postponed ones by their new date) or, for a flex spend, the
+     * current period.
      */
     public function nextOccurrence(): ?Occurrence
     {
@@ -127,7 +128,10 @@ class Recurring extends Model
                 ?? $this->occurrences->first(fn (Occurrence $occurrence): bool => $occurrence->due_on->gt($today));
         }
 
-        return $this->occurrences->first(fn (Occurrence $occurrence): bool => $occurrence->isOpen());
+        return $this->occurrences
+            ->filter(fn (Occurrence $occurrence): bool => $occurrence->isOpen())
+            ->sortBy(fn (Occurrence $occurrence): string => $occurrence->expectedOn()->toDateString())
+            ->first();
     }
 
     public function latestPayment(): ?Occurrence
@@ -316,9 +320,9 @@ class Recurring extends Model
     }
 
     /**
-     * SQL for the due date `nextOccurrence()` picks, with its bindings: a bill's
-     * or income's earliest unpaid due date, or a flex spend's current period,
-     * else its next one.
+     * SQL for the date `nextOccurrence()` picks, with its bindings: when a
+     * bill's or income's soonest unpaid due date is expected, or a flex spend's
+     * current period, else its next one.
      *
      * The current period is the latest one that has started, unless it was
      * skipped or is over. It runs until the next period starts, so it is still
@@ -336,7 +340,7 @@ class Recurring extends Model
             ->whereColumn("{$alias}.recurring_id", $this->qualifyColumn('id'));
 
         $unpaid = $dueDates('unpaid')
-            ->selectRaw('min(date(unpaid.due_on))')
+            ->selectRaw('min(date(coalesce(unpaid.postponed_to, unpaid.due_on)))')
             ->where($this->qualifyColumn('kind'), '!=', RecurringKind::Flex)
             ->open();
 

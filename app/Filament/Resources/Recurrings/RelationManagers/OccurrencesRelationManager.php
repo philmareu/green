@@ -42,9 +42,11 @@ class OccurrencesRelationManager extends RelationManager
                 TextColumn::make('due_on')
                     ->label($isFlex ? 'Period' : 'Due')
                     ->date('D, M j, Y')
-                    ->description(fn (Occurrence $record): ?string => $isFlex && ($end = $record->periodEnd())
-                        ? 'until '.$end->subDay()->format('M j')
-                        : null)
+                    ->description(fn (Occurrence $record): ?string => match (true) {
+                        $isFlex => ($end = $record->periodEnd()) ? 'until '.$end->subDay()->format('M j') : null,
+                        $record->postponed_to !== null => 'postponed to '.$record->postponed_to->format('M j'),
+                        default => null,
+                    })
                     ->sortable(),
                 TextColumn::make('status')
                     ->state(fn (Occurrence $record) => $record->status())
@@ -79,6 +81,10 @@ class OccurrencesRelationManager extends RelationManager
                 ActionGroup::make([
                     RecurringActions::markPaid()
                         ->visible(fn (Occurrence $record): bool => ! $isFlex && $record->isOpen()),
+                    RecurringActions::postpone()
+                        ->visible(fn (Occurrence $record): bool => ! $isFlex && $record->isOpen()),
+                    RecurringActions::restoreDueDate()
+                        ->visible(fn (Occurrence $record): bool => $record->postponed_to !== null && $record->isOpen()),
                     RecurringActions::skip()
                         ->visible(fn (Occurrence $record): bool => $record->isOpen()),
                     RecurringActions::reopen()

@@ -8,6 +8,7 @@ use App\Enums\OccurrenceStatus;
 use App\Enums\RecurringKind;
 use App\Services\Categories\CategorizeTransactions;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\OccurrenceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -20,9 +21,11 @@ use Illuminate\Support\Collection;
 /**
  * One due date of a recurring item, or one period of a flex spend. A bill or
  * income due date is paid by the linked transaction, or closed by hand with a
- * resolution (paid some other way, or skipped).
+ * resolution (paid some other way, or skipped). A bill's or income's due date
+ * can be postponed: `due_on` stays the scheduled date, and `postponed_to` is
+ * when it's expected instead (`expectedOn()`).
  */
-#[Fillable(['recurring_id', 'due_on', 'transaction_id', 'matched_by', 'resolution'])]
+#[Fillable(['recurring_id', 'due_on', 'postponed_to', 'transaction_id', 'matched_by', 'resolution'])]
 class Occurrence extends Model
 {
     /** @use HasFactory<OccurrenceFactory> */
@@ -59,6 +62,7 @@ class Occurrence extends Model
     {
         return [
             'due_on' => 'immutable_date',
+            'postponed_to' => 'immutable_date',
             'matched_by' => MatchSource::class,
             'resolution' => OccurrenceResolution::class,
         ];
@@ -74,6 +78,14 @@ class Occurrence extends Model
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    /**
+     * When it's expected: the postponed date, else the due date.
+     */
+    public function expectedOn(): CarbonImmutable
+    {
+        return $this->postponed_to ?? $this->due_on;
     }
 
     public function isOpen(): bool
@@ -105,7 +117,11 @@ class Occurrence extends Model
             return OccurrenceStatus::MarkedPaid;
         }
 
-        return $this->due_on->lt($today) ? OccurrenceStatus::Overdue : OccurrenceStatus::Upcoming;
+        if ($this->expectedOn()->lt($today)) {
+            return OccurrenceStatus::Overdue;
+        }
+
+        return $this->postponed_to !== null ? OccurrenceStatus::Postponed : OccurrenceStatus::Upcoming;
     }
 
     /**
@@ -131,7 +147,8 @@ class Occurrence extends Model
 
     /**
      * Transactions you could link by hand: on the item's account, going the
-     * right way, within 30 days of the due date, and not paying anything else.
+     * right way, within 30 days of when it's expected, and not paying anything
+     * else.
      *
      * @return Collection<int, Transaction>
      */
@@ -143,12 +160,14 @@ class Occurrence extends Model
             return collect();
         }
 
+        $expectedOn = $this->expectedOn();
+
         return Transaction::query()
             ->where('account_id', $recurring->account_id)
             ->where('amount', $recurring->kind->isOutflow() ? '>' : '<', 0)
             ->whereDoesntHave('occurrence')
-            ->whereRaw('date(coalesce(authorized_date, date)) >= ?', [$this->due_on->subDays(30)->toDateString()])
-            ->whereRaw('date(coalesce(authorized_date, date)) <= ?', [$this->due_on->addDays(30)->toDateString()])
+            ->whereRaw('date(coalesce(authorized_date, date)) >= ?', [$expectedOn->subDays(30)->toDateString()])
+            ->whereRaw('date(coalesce(authorized_date, date)) <= ?', [$expectedOn->addDays(30)->toDateString()])
             ->orderByDesc('date')
             ->get();
     }
@@ -181,14 +200,24 @@ class Occurrence extends Model
     }
 
     /**
+     * Only due dates expected on or before `$date` (postponed ones by their
+     * new date).
+     */
+    #[Scope]
+    protected function expectedBy(Builder $query, CarbonInterface $date): void
+    {
+        $query->whereRaw('date(coalesce(postponed_to, due_on)) <= ?', [$date->toDateString()]);
+    }
+
+    /**
      * The due dates `status()` calls overdue: a bill's or income's, unpaid,
-     * before today. A flex period is never overdue.
+     * expected before today. A flex period is never overdue.
      */
     #[Scope]
     protected function overdue(Builder $query): void
     {
         $query->open()
-            ->whereDate('due_on', '<', today()->toDateString())
+            ->whereRaw('date(coalesce(postponed_to, due_on)) < ?', [today()->toDateString()])
             ->whereHas('recurring', fn (Builder $recurring) => $recurring->where('kind', '!=', RecurringKind::Flex));
     }
 

@@ -57,3 +57,16 @@ it('adds a one-time expense to the register', function () {
         ->account_id->toBe($this->account->id)
         ->user_id->toBe($this->user->id);
 });
+
+it('postpones a bill from the register', function () {
+    $comcast = Recurring::factory()->for($this->account)->create(['amount' => 89, 'starts_on' => '2026-10-25']);
+    $dueDate = $comcast->occurrences()->whereDate('due_on', '2026-10-25')->sole();
+
+    Livewire::test(ForecastRegister::class, ['pageFilters' => ['account' => $this->account->id, 'weeks' => 4]])
+        ->callAction(TestAction::make('postpone')->table($dueDate->id), data: ['postponed_to' => '2026-11-03'])
+        ->assertHasNoFormErrors()
+        ->call('refreshForecast')
+        ->assertSee('Postponed from Oct 25');
+
+    expect($dueDate->fresh()->postponed_to->toDateString())->toBe('2026-11-03');
+});

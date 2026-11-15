@@ -21,6 +21,10 @@ it('finds as overdue exactly the due dates whose status is overdue', function ()
     Recurring::factory()->for($account)->create(['name' => 'Insurance', 'starts_on' => '2026-10-10'])
         ->occurrences()->whereDate('due_on', '2026-10-10')->sole()->update(['resolution' => OccurrenceResolution::Paid]);
     Recurring::factory()->for($account)->create(['name' => 'Rent', 'starts_on' => '2026-10-15']);
+    Recurring::factory()->for($account)->create(['name' => 'Phone', 'starts_on' => '2026-10-12'])
+        ->occurrences()->whereDate('due_on', '2026-10-12')->sole()->update(['postponed_to' => '2026-10-25']);
+    Recurring::factory()->for($account)->create(['name' => 'Gym', 'starts_on' => '2026-10-05'])
+        ->occurrences()->whereDate('due_on', '2026-10-05')->sole()->update(['postponed_to' => '2026-10-18']);
     Recurring::factory()->for($account)->income()->create(['name' => 'Retainer', 'starts_on' => '2026-10-20']);
     Recurring::factory()->for($account)->flex(Category::factory()->create())->create(['name' => 'Groceries', 'starts_on' => '2026-10-01']);
     $this->travelTo('2026-10-21 12:00');
@@ -29,7 +33,7 @@ it('finds as overdue exactly the due dates whose status is overdue', function ()
     $overdue = Occurrence::query()->overdue()->with('recurring')->get();
 
     expect($overdue->map(fn (Occurrence $occurrence): string => $occurrence->recurring->name.' '.$occurrence->due_on->toDateString())->all())
-        ->toEqualCanonicalizing(['Rent 2026-10-15', 'Retainer 2026-10-20'])
+        ->toEqualCanonicalizing(['Rent 2026-10-15', 'Retainer 2026-10-20', 'Gym 2026-10-05'])
         ->and($occurrences->map->status()->unique()->all())->toContain(...OccurrenceStatus::cases())
         ->and($occurrences->filter(fn (Occurrence $occurrence): bool => $occurrence->status() === OccurrenceStatus::Overdue)->values()->modelKeys())
         ->toEqualCanonicalizing($overdue->modelKeys());
