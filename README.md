@@ -25,7 +25,7 @@ Built with [Laravel](https://laravel.com) and [Filament](https://filamentphp.com
 - **Dashboard** with cash available and credit owed per Book, plus every pending transaction in one table.
 - **Connection health.** Banks that need you to sign in again are flagged, with a one-click reconnect.
 - **Live balance** on demand, straight from the bank.
-- **Notifications** you choose per user, in the app or by email. Get an alert when a cash account goes negative. Email needs a mail provider: Green ships with the [Resend](https://resend.com) driver (`MAIL_MAILER=resend`, `RESEND_API_KEY`), or set any other Laravel mailer in `MAIL_*`.
+- **Notifications** you choose per user, in the app or by email. Get an alert when a cash account goes negative, and set reminders on bills and income, such as "3 days before: cancel Netflix", once or before every due date. Email needs a mail provider: Green ships with the [Resend](https://resend.com) driver (`MAIL_MAILER=resend`, `RESEND_API_KEY`), or set any other Laravel mailer in `MAIL_*`.
 - **Category sets** per Book, with one level of subcategories and income, expense or transfer types. Start from a Business set based on IRS Schedule C or a Personal set, then edit freely.
 - **Categorize from the transaction list.** Green suggests a category from Plaid's own category (you choose which Plaid categories feed each of yours), and anything you pick yourself is kept, even when a pending transaction posts.
 - **Recurring bills, flex spends and income.** Each bill shows the transaction that paid it and how it matched. Green links a payment only when its description contains the payee you set, so a matching amount alone never counts, and it allows for small price changes. Anything you unlink stays unlinked. Flex spends such as groceries or gas are weekly or monthly budgets used up by a category. Postpone a single bill or income to a later date and the forecast moves it, while later due dates stay on schedule. Turn any transaction into a recurring item in one click.
@@ -103,7 +103,7 @@ New Plaid teams can use a free Trial plan for a limited number of real bank conn
 * * * * * cd /path/to/green && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Locally, `php artisan schedule:work` does the same in the foreground.
+Locally, `php artisan schedule:work` does the same in the foreground. The scheduler also sends reminders every morning at 08:00 in `APP_TIMEZONE` with `php artisan reminders:send`.
 
 `.env.example` sets `QUEUE_CONNECTION=sync`, so syncs run immediately and no queue worker is needed. If you switch to the `database` or `redis` queue, also run `php artisan queue:work`.
 

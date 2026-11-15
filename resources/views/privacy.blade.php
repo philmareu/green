@@ -65,7 +65,7 @@
 <body>
     <main>
         <h1>Privacy policy</h1>
-        <p class="muted">Green · Last updated November 6, 2026</p>
+        <p class="muted">Green · Last updated November 15, 2026</p>
 
         <p>
             Green is an open-source personal finance app. This copy of Green is run privately by its owner
@@ -77,9 +77,9 @@
             <li>Your login: name, email address, a hashed password, and your two-factor authentication secret and recovery codes (encrypted).</li>
             <li>Sign-in sessions, which record your IP address and browser.</li>
             <li>From each bank you connect through Plaid: the bank's name; each account's name, type, last few digits and balances; and its transactions, including the date, amount, description, merchant, category and the rest of the record Plaid provides, which can include the merchant's location.</li>
-            <li>What you add yourself, such as Books, categories, recurring bills, budgets and expected income.</li>
+            <li>What you add yourself, such as Books, categories, recurring bills, budgets, expected income and reminders.</li>
             <li>A log of Green's activity with Plaid, so sync problems can be spotted: for each sync, live balance check, bank link or removal, the bank's name, when it ran and what started it, how long it took, how many transactions it added, updated or removed, whether it worked (with Plaid's error code and message if not), and Plaid's ID for each request. The log never holds access tokens or any transaction details, and each entry is deleted after 14 days.</li>
-            <li>Your notification settings, and the alerts Green shows you, which can include an account's name, last few digits and balance. Alerts stay until you clear them, even if you remove the bank connection.</li>
+            <li>Your notification settings, and the alerts Green shows you, which can include an account's name, last few digits and balance, or a bill's name, due date, amount and your reminder note. Alerts stay until you clear them, even if you remove the bank connection.</li>
         </ul>
         <p>
             Green never sees your bank username or password: you enter them with Plaid. It doesn't request full account
@@ -91,7 +91,7 @@
             Only to show you your balances and transactions, categorize them, track recurring bills, budgets and income,
             and forecast your balances. Green has no ads, analytics or tracking, and never sells or shares your data.
             The only other parties involved are Plaid, as described below, and, if you turn on email alerts, the mail
-            provider this installation uses to deliver them. Those emails name the account and its last few digits, but not its balance.
+            provider this installation uses to deliver them. Negative balance emails name the account and its last few digits, but not its balance. Reminder emails name the bill or income, its due date and your note, but not the amount.
         </p>
 
         <h2>Plaid</h2>

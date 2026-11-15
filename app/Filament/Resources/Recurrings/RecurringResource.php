@@ -7,6 +7,7 @@ use App\Filament\Resources\Recurrings\Pages\EditRecurring;
 use App\Filament\Resources\Recurrings\Pages\ListRecurrings;
 use App\Filament\Resources\Recurrings\Pages\ViewRecurring;
 use App\Filament\Resources\Recurrings\RelationManagers\OccurrencesRelationManager;
+use App\Filament\Resources\Recurrings\RelationManagers\RemindersRelationManager;
 use App\Filament\Resources\Recurrings\Schemas\RecurringForm;
 use App\Filament\Resources\Recurrings\Schemas\RecurringInfolist;
 use App\Filament\Resources\Recurrings\Tables\RecurringsTable;
@@ -77,6 +78,7 @@ class RecurringResource extends Resource
     {
         return [
             OccurrencesRelationManager::class,
+            RemindersRelationManager::class,
         ];
     }
 

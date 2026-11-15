@@ -114,6 +114,12 @@ class Recurring extends Model
         return $this->hasMany(Occurrence::class)->orderBy('due_on')->chaperone();
     }
 
+    /** @return HasMany<Reminder, $this> */
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(Reminder::class);
+    }
+
     /**
      * The due date to watch: the unpaid one expected soonest (overdue ones
      * first, postponed ones by their new date) or, for a flex spend, the

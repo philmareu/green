@@ -9,11 +9,13 @@ namespace App\Enums;
 enum NotificationType: string
 {
     case NegativeBalance = 'negative_balance';
+    case Reminder = 'reminder';
 
     public function label(): string
     {
         return match ($this) {
             self::NegativeBalance => 'Negative balance',
+            self::Reminder => 'Reminders',
         };
     }
 
@@ -21,6 +23,7 @@ enum NotificationType: string
     {
         return match ($this) {
             self::NegativeBalance => 'When a cash account drops below zero, usually after a pending transaction. You get one alert each time it goes negative.',
+            self::Reminder => 'The reminders you set on bills and income, sent in the morning the set number of days before the due date. Nothing is sent for a due date that is already paid or skipped.',
         };
     }
 
@@ -33,7 +36,7 @@ enum NotificationType: string
     public function defaultChannels(): array
     {
         return match ($this) {
-            self::NegativeBalance => ['database'],
+            self::NegativeBalance, self::Reminder => ['database'],
         };
     }
 }
