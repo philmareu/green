@@ -7,6 +7,7 @@ use App\Enums\OccurrenceResolution;
 use App\Models\Occurrence;
 use App\Models\Transaction;
 use Filament\Actions\Action;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Number;
@@ -71,6 +72,37 @@ class RecurringActions
             ->icon(Heroicon::OutlinedForward)
             ->color('gray')
             ->action(fn (Occurrence|array $record) => static::resolve($record)->update(['resolution' => OccurrenceResolution::Skipped]));
+    }
+
+    /**
+     * Expect a bill or income later this time, without changing its schedule.
+     */
+    public static function postpone(): Action
+    {
+        return Action::make('postpone')
+            ->icon(Heroicon::OutlinedCalendarDays)
+            ->color('gray')
+            ->modalHeading('Postpone this due date')
+            ->modalDescription('The forecast and the overdue check use the new date. Later due dates stay on schedule.')
+            ->modalSubmitActionLabel('Postpone')
+            ->fillForm(fn (Occurrence|array $record): array => ['postponed_to' => static::resolve($record)->postponed_to])
+            ->schema(fn (Occurrence|array $record): array => [
+                DatePicker::make('postponed_to')
+                    ->label('New date')
+                    ->after(static::resolve($record)->due_on->toDateString())
+                    ->validationMessages(['after' => 'Choose a date after the due date.'])
+                    ->required(),
+            ])
+            ->action(fn (Occurrence|array $record, array $data) => static::resolve($record)->update(['postponed_to' => $data['postponed_to']]));
+    }
+
+    public static function restoreDueDate(): Action
+    {
+        return Action::make('restoreDueDate')
+            ->label('Restore due date')
+            ->icon(Heroicon::OutlinedArrowUturnLeft)
+            ->color('gray')
+            ->action(fn (Occurrence|array $record) => static::resolve($record)->update(['postponed_to' => null]));
     }
 
     public static function reopen(): Action

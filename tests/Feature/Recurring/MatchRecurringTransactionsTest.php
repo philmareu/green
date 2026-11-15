@@ -121,3 +121,14 @@ it('keeps earlier links when the price changes, and releases them when the payee
     $comcast->update(['payee' => 'xfinity']);
     expect(linkedTo($comcast))->toBe(['2026-10-15' => 'ONLINE PAYMENT 4471']);
 });
+
+it('links a postponed bill to a payment near its new date, outside the old date’s window', function () {
+    $comcast = bill($this->account);
+    $comcast->occurrences()->whereDate('due_on', '2026-10-15')->sole()->update(['postponed_to' => '2026-10-30']);
+    $this->travelTo('2026-10-30 12:00');
+    payment($this->account, '2026-10-29', 89.00, 'COMCAST CABLE 8823');
+
+    matchAccount($this->account);
+
+    expect(linkedTo($comcast))->toBe(['2026-10-15' => 'COMCAST CABLE 8823']);
+});

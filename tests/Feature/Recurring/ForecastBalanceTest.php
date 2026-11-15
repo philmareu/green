@@ -90,3 +90,26 @@ it('reserves what is left of a flex budget this period, then the full budget for
         ['2026-10-26', 'Groceries', -150.0, 752.4],
     ]);
 });
+
+it('counts a postponed bill on its new date, and as overdue once that date passes', function () {
+    $this->travelTo('2026-10-01');
+    $comcast = Recurring::factory()->for($this->account)->create(['name' => 'Comcast', 'amount' => 89, 'starts_on' => '2026-10-25']);
+    $comcast->occurrences()->whereDate('due_on', '2026-10-25')->sole()->update(['postponed_to' => '2026-11-03']);
+    $rent = Recurring::factory()->for($this->account)->create(['name' => 'Rent', 'amount' => 900, 'starts_on' => '2026-10-10']);
+    $rent->occurrences()->whereDate('due_on', '2026-10-10')->sole()->update(['postponed_to' => '2026-10-18']);
+    $this->travelTo('2026-10-21');
+
+    $forecast = forecast($this->account, '2026-11-30');
+
+    expect(register($forecast))->toBe([
+        ['2026-10-21', 'Rent', -900.0, 100.0],
+        ['2026-11-03', 'Comcast', -89.0, 11.0],
+        ['2026-11-10', 'Rent', -900.0, -889.0],
+        ['2026-11-25', 'Comcast', -89.0, -978.0],
+    ])
+        ->and($forecast->entries[0]->note)->toBe('Overdue since Oct 18')
+        ->and($forecast->entries[1]->note)->toBe('Postponed from Oct 25')
+        ->and(register(forecast($this->account, '2026-10-31')))->toBe([
+            ['2026-10-21', 'Rent', -900.0, 100.0],
+        ]);
+});

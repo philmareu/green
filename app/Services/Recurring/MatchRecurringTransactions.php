@@ -7,6 +7,7 @@ use App\Enums\RecurringKind;
 use App\Models\Occurrence;
 use App\Models\Recurring;
 use App\Models\Transaction;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,8 +16,9 @@ use Illuminate\Support\Facades\DB;
  *
  * A transaction pays a due date when it's on the item's account, goes the right
  * way, its description contains the item's payee, its amount is within the
- * item's tolerance, and its date is within the frequency's match window. A
- * matching amount alone is never enough. Links you made by hand are kept, and
+ * item's tolerance, and its date is within the frequency's match window of
+ * when the due date is expected (its new date, when postponed). A matching
+ * amount alone is never enough. Links you made by hand are kept, and
  * transactions you unlinked are never linked again.
  */
 class MatchRecurringTransactions
@@ -103,18 +105,20 @@ class MatchRecurringTransactions
         $occurrences = Occurrence::query()
             ->whereIn('recurring_id', $recurrings->keys())
             ->open()
-            ->whereDate('due_on', '<=', today()->addDays($widestWindow)->toDateString())
+            ->expectedBy(today()->addDays($widestWindow))
             ->get();
 
         if ($occurrences->isEmpty()) {
             return 0;
         }
 
+        $expectedOn = $occurrences->map(fn (Occurrence $occurrence): CarbonImmutable => $occurrence->expectedOn());
+
         $transactions = Transaction::query()
             ->where('account_id', $accountId)
             ->whereDoesntHave('occurrence')
-            ->whereRaw('date(coalesce(authorized_date, date)) >= ?', [$occurrences->min('due_on')->subDays($widestWindow)->toDateString()])
-            ->whereRaw('date(coalesce(authorized_date, date)) <= ?', [$occurrences->max('due_on')->addDays($widestWindow)->toDateString()])
+            ->whereRaw('date(coalesce(authorized_date, date)) >= ?', [$expectedOn->min()->subDays($widestWindow)->toDateString()])
+            ->whereRaw('date(coalesce(authorized_date, date)) <= ?', [$expectedOn->max()->addDays($widestWindow)->toDateString()])
             ->get();
 
         $pairs = [];
@@ -123,7 +127,7 @@ class MatchRecurringTransactions
             $recurring = $recurrings[$occurrence->recurring_id];
 
             foreach ($transactions as $transaction) {
-                $days = (int) abs($transaction->display_date->startOfDay()->diffInDays($occurrence->due_on));
+                $days = (int) abs($transaction->display_date->startOfDay()->diffInDays($occurrence->expectedOn()));
 
                 if ($days > $recurring->frequency->matchWindowDays() || ! $recurring->matches($transaction)) {
                     continue;

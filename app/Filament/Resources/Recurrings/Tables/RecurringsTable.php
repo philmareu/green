@@ -42,7 +42,7 @@ class RecurringsTable
                     ->sortable(),
                 TextColumn::make('next')
                     ->label('Next')
-                    ->state(fn (Recurring $record) => $record->nextOccurrence()?->due_on)
+                    ->state(fn (Recurring $record) => $record->nextOccurrence()?->expectedOn())
                     ->date('M j, Y')
                     ->description(fn (Recurring $record): ?string => $record->nextOccurrence()?->status()->getLabel())
                     ->color(fn (Recurring $record): ?string => $record->nextOccurrence()?->status()->getColor())

@@ -208,3 +208,21 @@ it('links a payment by hand even when it doesn’t match the payee', function ()
 
     expect($occurrence->fresh())->transaction_id->toBe($transfer->id)->matched_by->toBe(MatchSource::Manual);
 });
+
+it('postpones a due date to a later date, and restores it', function () {
+    $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-25']);
+    $occurrence = $comcast->occurrences()->whereDate('due_on', '2026-10-25')->sole();
+    $dueDates = fn () => Livewire::test(OccurrencesRelationManager::class, ['ownerRecord' => $comcast, 'pageClass' => ViewRecurring::class]);
+
+    $dueDates()->callAction(TestAction::make('postpone')->table($occurrence), data: ['postponed_to' => '2026-10-25'])
+        ->assertHasFormErrors(['postponed_to' => 'Choose a date after the due date.']);
+    expect($occurrence->fresh()->postponed_to)->toBeNull();
+
+    $dueDates()->callAction(TestAction::make('postpone')->table($occurrence), data: ['postponed_to' => '2026-11-03'])
+        ->assertHasNoFormErrors()
+        ->assertSee('postponed to Nov 3');
+    expect($occurrence->fresh()->postponed_to->toDateString())->toBe('2026-11-03');
+
+    $dueDates()->callAction(TestAction::make('restoreDueDate')->table($occurrence));
+    expect($occurrence->fresh()->postponed_to)->toBeNull();
+});

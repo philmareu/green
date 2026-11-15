@@ -9,6 +9,7 @@ enum OccurrenceStatus: string implements HasColor, HasLabel
 {
     case Upcoming = 'upcoming';
     case Overdue = 'overdue';
+    case Postponed = 'postponed';
     case Pending = 'pending';
     case Paid = 'paid';
     case MarkedPaid = 'marked_paid';
@@ -21,6 +22,7 @@ enum OccurrenceStatus: string implements HasColor, HasLabel
         return match ($this) {
             self::Upcoming => 'Upcoming',
             self::Overdue => 'Overdue',
+            self::Postponed => 'Postponed',
             self::Pending => 'Pending',
             self::Paid => 'Paid',
             self::MarkedPaid => 'Marked paid',
@@ -36,7 +38,7 @@ enum OccurrenceStatus: string implements HasColor, HasLabel
             self::Overdue => 'danger',
             self::Pending => 'warning',
             self::Paid, self::MarkedPaid => 'success',
-            self::Current => 'info',
+            self::Current, self::Postponed => 'info',
             default => 'gray',
         };
     }

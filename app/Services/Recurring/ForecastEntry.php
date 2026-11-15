@@ -19,6 +19,7 @@ final readonly class ForecastEntry
         public int $occurrenceId,
         public int $recurringId,
         public bool $isOneTime,
+        public bool $isPostponed = false,
         public ?string $note = null,
     ) {}
 }

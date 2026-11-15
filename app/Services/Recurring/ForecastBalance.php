@@ -18,6 +18,7 @@ use Illuminate\Support\Number;
  *
  * - The available balance already includes pending transactions, so a bill
  *   linked to one isn't counted again.
+ * - A postponed bill or income counts on its new date.
  * - Unpaid bills past their due date count today: better to plan for them.
  * - Late income counts until its match window passes, then it's left out.
  * - A flex spend reserves what's left of this period today, and its full
@@ -36,9 +37,7 @@ class ForecastBalance
         foreach ($recurrings as $recurring) {
             $recurring->syncOccurrences($until->max($today->addDays(Recurring::HORIZON_DAYS)));
 
-            $occurrences = $recurring->occurrences()
-                ->whereDate('due_on', '<=', $until->toDateString())
-                ->get();
+            $occurrences = $recurring->occurrences()->expectedBy($until)->get();
 
             foreach ($occurrences as $occurrence) {
                 $occurrence->setRelation('recurring', $recurring);
@@ -79,16 +78,18 @@ class ForecastBalance
             return null;
         }
 
-        $late = $occurrence->due_on->lt($today);
+        $expectedOn = $occurrence->expectedOn();
+        $late = $expectedOn->lt($today);
 
-        if ($late && ! $recurring->kind->isOutflow() && $occurrence->due_on->lt($today->subDays($recurring->frequency->matchWindowDays()))) {
+        if ($late && ! $recurring->kind->isOutflow() && $expectedOn->lt($today->subDays($recurring->frequency->matchWindowDays()))) {
             return null;
         }
 
-        return $this->line($occurrence, $late ? $today : $occurrence->due_on, (float) $recurring->amount, match (true) {
-            ! $late => null,
-            $recurring->kind->isOutflow() => 'Overdue since '.$occurrence->due_on->format('M j'),
-            default => 'Expected '.$occurrence->due_on->format('M j'),
+        return $this->line($occurrence, $late ? $today : $expectedOn, (float) $recurring->amount, match (true) {
+            $late && $recurring->kind->isOutflow() => 'Overdue since '.$expectedOn->format('M j'),
+            $late => 'Expected '.$expectedOn->format('M j'),
+            $occurrence->postponed_to !== null => 'Postponed from '.$occurrence->due_on->format('M j'),
+            default => null,
         });
     }
 
@@ -137,6 +138,7 @@ class ForecastBalance
             'occurrenceId' => $occurrence->getKey(),
             'recurringId' => $recurring->getKey(),
             'isOneTime' => $recurring->frequency === Frequency::Once,
+            'isPostponed' => $occurrence->postponed_to !== null,
             'note' => $note,
         ];
     }
