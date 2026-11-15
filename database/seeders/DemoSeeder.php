@@ -13,6 +13,7 @@ use App\Models\PlaidLog;
 use App\Models\Recurring;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Notifications\AccountWentNegative;
 use App\Services\Categories\CategorizeTransactions;
 use App\Services\Categories\StarterCategories;
 use Illuminate\Database\Seeder;
@@ -82,6 +83,15 @@ class DemoSeeder extends Seeder
             'available_balance' => 2987.10,
         ]);
 
+        // Overdrawn, with the alert Green sent when it dipped.
+        $jointChecking = Account::factory()->for($bank)->create([
+            'book_id' => $personal->id,
+            'name' => 'Joint Checking',
+            'mask' => '7310',
+            'current_balance' => -184.22,
+            'available_balance' => -246.80,
+        ]);
+
         $card = PlaidItem::factory()->for($user)->create([
             'institution_name' => 'Tattersall Federal Credit Union',
             'status' => PlaidItemStatus::LoginRequired,
@@ -100,6 +110,7 @@ class DemoSeeder extends Seeder
         $this->spending($businessChecking, 'business', posted: 22, pending: 2);
         $this->spending($personalChecking, 'personal', posted: 18, pending: 2);
         $this->spending($personalCard, 'personal', posted: 20, pending: 3);
+        $this->spending($jointChecking, 'personal', posted: 8, pending: 1);
 
         foreach ([3, 33] as $daysAgo) {
             $this->income($businessChecking, 'Client payment: Invoice '.random_int(1000, 1099), 8500, $daysAgo);
@@ -111,6 +122,17 @@ class DemoSeeder extends Seeder
 
         $this->recurring($user, $businessChecking, $personalChecking);
         $this->plaidActivity($bank, $card);
+        $this->negativeBalanceAlert($user, $jointChecking);
+    }
+
+    /**
+     * The in-app alert for the overdrawn account, as a sync would have sent it.
+     */
+    private function negativeBalanceAlert(User $user, Account $account): void
+    {
+        $account->forceFill(['negative_notified_at' => now()])->save();
+
+        $user->notifyNow(new AccountWentNegative($account, $account->spendableBalance()), ['database']);
     }
 
     /**
