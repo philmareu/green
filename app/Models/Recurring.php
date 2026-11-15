@@ -28,7 +28,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * transaction's description contains `payee`, so a matching amount alone never
  * counts. `amount` is always positive; `kind` gives the direction. A bill's or
  * income's `category` goes on the transactions linked to it; a flex spend's is
- * the category its budget counts.
+ * the category its budget counts. A bill's `autopay` says it's paid
+ * automatically; without it you pay by hand, and the lists flag it.
  */
 #[Fillable([
     'user_id',
@@ -41,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'ends_on',
     'payee',
     'amount_tolerance',
+    'autopay',
     'category_id',
     'dismissed_transactions',
 ])]
@@ -86,6 +88,7 @@ class Recurring extends Model
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
             'amount_tolerance' => 'integer',
+            'autopay' => 'boolean',
             'dismissed_transactions' => 'array',
         ];
     }
@@ -293,6 +296,14 @@ class Recurring extends Model
             ->whereRaw('date(coalesce(authorized_date, date)) < ?', [$until->toDateString()])
             ->whereDoesntHave('occurrence')
             ->sum('amount'), 2);
+    }
+
+    /**
+     * Bills you pay yourself.
+     */
+    public function isPaidByHand(): bool
+    {
+        return $this->kind === RecurringKind::Bill && ! $this->autopay;
     }
 
     #[Scope]
