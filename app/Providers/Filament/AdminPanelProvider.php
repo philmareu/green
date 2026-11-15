@@ -2,7 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\NotificationPreferences;
 use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -13,6 +15,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -33,6 +36,13 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('Green')
             ->login()
             ->profile()
+            ->databaseNotifications()
+            ->userMenuItems([
+                Action::make('notifications')
+                    ->label('Notifications')
+                    ->url(fn (): string => NotificationPreferences::getUrl())
+                    ->icon(Heroicon::OutlinedBellAlert),
+            ])
             // Bank data sits behind this login: production makes everyone set up an
             // authenticator app on their next sign-in.
             ->multiFactorAuthentication([

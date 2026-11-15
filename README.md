@@ -25,6 +25,7 @@ Built with [Laravel](https://laravel.com) and [Filament](https://filamentphp.com
 - **Dashboard** with cash available and credit owed per Book, plus every pending transaction in one table.
 - **Connection health.** Banks that need you to sign in again are flagged, with a one-click reconnect.
 - **Live balance** on demand, straight from the bank.
+- **Notifications** you choose per user, in the app or by email. Get an alert when a cash account goes negative. Email needs a mail provider: Green ships with the [Resend](https://resend.com) driver (`MAIL_MAILER=resend`, `RESEND_API_KEY`), or set any other Laravel mailer in `MAIL_*`.
 - **Category sets** per Book, with one level of subcategories and income, expense or transfer types. Start from a Business set based on IRS Schedule C or a Personal set, then edit freely.
 - **Categorize from the transaction list.** Green suggests a category from Plaid's own category (you choose which Plaid categories feed each of yours), and anything you pick yourself is kept, even when a pending transaction posts.
 - **Recurring bills, flex spends and income.** Each bill shows the transaction that paid it and how it matched. Green links a payment only when its description contains the payee you set, so a matching amount alone never counts, and it allows for small price changes. Anything you unlink stays unlinked. Flex spends such as groceries or gas are weekly or monthly budgets used up by a category. Turn any transaction into a recurring item in one click.
@@ -87,7 +88,7 @@ php artisan plaid:sandbox-link 1   # 1 = the Book's id
 
 ### Going to production
 
-Set `APP_ENV=production` and `APP_DEBUG=false`, set `PLAID_ENV=production` and use your production secret, and set `APP_TIMEZONE` (e.g. `America/Chicago`) so due dates and the forecast follow your day. Set `PRIVACY_CONTACT_EMAIL` to the address shown on Green's public privacy page (`/privacy`). Two things change:
+Set `APP_ENV=production` and `APP_DEBUG=false`, set `PLAID_ENV=production` and use your production secret, and set `APP_TIMEZONE` (e.g. `America/Chicago`) so due dates and the forecast follow your day. Set `PRIVACY_CONTACT_EMAIL` to the address shown on Green's public privacy page (`/privacy`). For email alerts, set `MAIL_MAILER=resend`, `RESEND_API_KEY`, and a `MAIL_FROM_ADDRESS` on a domain you've verified in Resend. Two things change:
 
 - **Serve Green over HTTPS.** Plaid requires it in production, and you are storing bank access tokens.
 - **OAuth banks** (Chase, Capital One, Wells Fargo and others) send users back to a registered redirect URL. Set `PLAID_REDIRECT_URI=https://your-domain/plaid/oauth` and add the same URL to the allowed redirect URIs in the Plaid dashboard.
