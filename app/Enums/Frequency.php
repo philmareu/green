@@ -48,6 +48,20 @@ enum Frequency: string implements HasLabel
     }
 
     /**
+     * Months from one due date to the next, for the frequencies counted in
+     * months; null for the others.
+     */
+    public function months(): ?int
+    {
+        return match ($this) {
+            self::Monthly => 1,
+            self::EveryThreeMonths => 3,
+            self::Yearly => 12,
+            default => null,
+        };
+    }
+
+    /**
      * How many days before or after a due date a payment still counts for it.
      * Kept under half a period so neighbouring due dates don't compete.
      */

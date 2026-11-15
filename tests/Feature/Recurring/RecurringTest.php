@@ -101,3 +101,24 @@ it('orders a postponed bill by its new date, or by its next due date once the ne
             'Rent' => '2026-11-15',
         ]);
 });
+
+it('spreads quarterly and yearly bills over the months between due dates', function () {
+    $this->travelTo('2026-09-01 12:00');
+    $water = Recurring::factory()->for($this->account)->create(['name' => 'Water', 'amount' => 300, 'frequency' => Frequency::EveryThreeMonths, 'starts_on' => '2026-09-20']);
+    $this->travelTo('2026-10-01 12:00');
+    $insurance = Recurring::factory()->for($this->account)->create(['name' => 'Insurance', 'amount' => 1200, 'frequency' => Frequency::Yearly, 'starts_on' => '2027-01-01']);
+    $tax = Recurring::factory()->for($this->account)->create(['name' => 'Tax', 'amount' => 300, 'frequency' => Frequency::EveryThreeMonths, 'starts_on' => '2026-11-15']);
+    $rent = Recurring::factory()->for($this->account)->create(['name' => 'Rent', 'amount' => 1200, 'frequency' => Frequency::Monthly, 'starts_on' => '2026-10-15']);
+    $dividend = Recurring::factory()->for($this->account)->income()->create(['amount' => 1200, 'frequency' => Frequency::Yearly, 'starts_on' => '2027-01-01']);
+    $setAside = fn (Recurring $recurring): array => [$recurring->monthlySetAside(), $recurring->fresh()->setAsideByNow()];
+
+    expect($setAside($insurance))->toBe([100.0, 897.53])
+        ->and($setAside($tax))->toBe([100.0, 153.26])
+        ->and($setAside($water))->toBe([100.0, 300.0])
+        ->and($setAside($rent))->toBe([null, null])
+        ->and($setAside($dividend))->toBe([null, null]);
+
+    $water->occurrences()->whereDate('due_on', '2026-09-20')->sole()->update(['resolution' => OccurrenceResolution::Paid]);
+
+    expect($water->fresh()->setAsideByNow())->toBe(36.26);
+});

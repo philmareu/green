@@ -8,6 +8,7 @@ use App\Models\Recurring;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Number;
 
 class RecurringInfolist
 {
@@ -45,6 +46,15 @@ class RecurringInfolist
                             ->badge()
                             ->color(fn (Recurring $record): string => $record->autopay ? 'gray' : 'warning')
                             ->visible(fn (Recurring $record): bool => $record->kind === RecurringKind::Bill),
+                        TextEntry::make('set_aside')
+                            ->label('Set aside')
+                            ->state(fn (Recurring $record): ?string => $record->needsSetAside()
+                                ? Number::currency($record->monthlySetAside(), $record->account?->currency ?? 'USD').' a month'
+                                : null)
+                            ->helperText(fn (Recurring $record): ?string => ($byNow = $record->setAsideByNow()) !== null
+                                ? Number::currency($byNow, $record->account?->currency ?? 'USD').' by now for '.$record->nextSetAsideDueDate()['expected_on']->format('M j')
+                                : null)
+                            ->visible(fn (Recurring $record): bool => $record->needsSetAside()),
                         TextEntry::make('rolls_over')
                             ->label('Rollover')
                             ->state(fn (Recurring $record): string => $record->rolls_over ? 'Rolls over' : 'Resets each period')

@@ -14,6 +14,7 @@ use App\Filament\Resources\Recurrings\Pages\ViewRecurring;
 use App\Filament\Resources\Recurrings\RecurringResource;
 use App\Filament\Resources\Recurrings\RelationManagers\OccurrencesRelationManager;
 use App\Filament\Resources\Recurrings\RelationManagers\RemindersRelationManager;
+use App\Filament\Resources\Recurrings\Widgets\SetAsideOverview;
 use App\Filament\Resources\Transactions\Pages\ListTransactions;
 use App\Models\Account;
 use App\Models\Book;
@@ -297,4 +298,28 @@ it('shows each period’s budget with what rolled over when a flex spend rolls o
     Livewire::test(OccurrencesRelationManager::class, ['ownerRecord' => $groceries, 'pageClass' => ViewRecurring::class])
         ->assertTableColumnStateSet('budget', 130.0, $thisWeek)
         ->assertTableColumnHasDescription('budget', '+$30.00 rolled over', $thisWeek);
+});
+
+it('totals what to set aside for quarterly and yearly bills, and shows it on each bill', function () {
+    $insurance = Recurring::factory()->for($this->account)->create(['name' => 'Insurance', 'amount' => 1200, 'frequency' => Frequency::Yearly, 'starts_on' => '2027-01-01']);
+    Recurring::factory()->for($this->account)->create(['name' => 'Tax', 'amount' => 300, 'frequency' => Frequency::EveryThreeMonths, 'starts_on' => '2026-11-15']);
+    Recurring::factory()->for(Account::factory())->create(['amount' => 6000, 'frequency' => Frequency::Yearly, 'starts_on' => '2027-01-01']);
+
+    Livewire::test(SetAsideOverview::class)
+        ->assertSee('$200.00')
+        ->assertSee('Across 2 bills')
+        ->assertSee('$1,181.77');
+
+    Livewire::test(ListRecurrings::class)
+        ->assertTableColumnHasDescription('amount', 'per year · $100.00/mo to set aside', $insurance);
+
+    Livewire::test(ViewRecurring::class, ['record' => $insurance->getRouteKey()])
+        ->assertSee('$100.00 a month')
+        ->assertSee('$963.29 by now for Jan 1');
+});
+
+it('hides the set-aside totals when there are no quarterly or yearly bills', function () {
+    Recurring::factory()->for($this->account)->create();
+
+    expect(SetAsideOverview::canView())->toBeFalse();
 });
