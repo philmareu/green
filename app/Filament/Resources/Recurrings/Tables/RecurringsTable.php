@@ -49,7 +49,11 @@ class RecurringsTable
                     ->badge(),
                 TextColumn::make('amount')
                     ->money(fn (Recurring $record): string => $record->account?->currency ?? 'USD')
-                    ->description(fn (Recurring $record): string => ($unit = $record->frequency->unit()) ? "per {$unit}" : 'one time')
+                    ->description(fn (Recurring $record): string => match (true) {
+                        $record->needsSetAside() => "per {$record->frequency->unit()} · ".Number::currency($record->monthlySetAside(), $record->account?->currency ?? 'USD').'/mo to set aside',
+                        ($unit = $record->frequency->unit()) !== null => "per {$unit}",
+                        default => 'one time',
+                    })
                     ->sortable(),
                 TextColumn::make('next')
                     ->label('Next')

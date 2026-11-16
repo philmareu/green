@@ -165,6 +165,7 @@ class DemoSeeder extends Seeder
             [$personalChecking, RecurringKind::Flex, 'Gas', 60, Frequency::Weekly, today()->startOfWeek(), ['category_id' => $category('Fuel')]],
             [$personalChecking, RecurringKind::Income, 'Owner draw', 2000, Frequency::EveryTwoWeeks, today()->subDays(2), ['payee' => 'owner draw']],
             [$personalChecking, RecurringKind::Bill, 'Car repair', 800, Frequency::Once, today()->addDays(9), []],
+            [$personalChecking, RecurringKind::Bill, 'Car insurance', 1200, Frequency::Yearly, today()->addMonthsNoOverflow(5), ['autopay' => true]],
             [$businessChecking, RecurringKind::Income, 'Client retainer', 8500, Frequency::Monthly, today()->subDays(33), ['payee' => 'client payment', 'amount_tolerance' => null]],
         ];
 

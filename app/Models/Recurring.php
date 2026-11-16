@@ -306,6 +306,77 @@ class Recurring extends Model
     }
 
     /**
+     * Quarterly and yearly bills, which are easier to pay from money put
+     * aside each month.
+     */
+    public function needsSetAside(): bool
+    {
+        return $this->kind === RecurringKind::Bill && ($this->frequency->months() ?? 0) > 1;
+    }
+
+    /**
+     * What to put aside each month: the amount spread over the months
+     * between due dates.
+     */
+    public function monthlySetAside(): ?float
+    {
+        return $this->needsSetAside() ? round((float) $this->amount / $this->frequency->months(), 2) : null;
+    }
+
+    /**
+     * What should be put aside by today for the next unpaid due date: its
+     * amount times the share of the period gone since the due date before
+     * it. All of it once the due date (or its postponed date) arrives. A due
+     * date beyond the ones created so far comes from the schedule.
+     */
+    public function setAsideByNow(): ?float
+    {
+        $dueOn = $this->nextSetAsideDueDate();
+
+        if ($dueOn === null) {
+            return null;
+        }
+
+        $today = today()->toImmutable();
+        $start = $dueOn['due_on']->subMonthsNoOverflow($this->frequency->months());
+        $end = $dueOn['expected_on'];
+
+        if ($today->gte($end)) {
+            return (float) $this->amount;
+        }
+
+        $share = max(0, $start->diffInDays($today)) / $start->diffInDays($end);
+
+        return round((float) $this->amount * $share, 2);
+    }
+
+    /**
+     * The due date `setAsideByNow()` saves toward: the next unpaid one, else
+     * the first scheduled after the ones already created.
+     *
+     * @return array{due_on: CarbonImmutable, expected_on: CarbonImmutable}|null
+     */
+    public function nextSetAsideDueDate(): ?array
+    {
+        if (! $this->needsSetAside()) {
+            return null;
+        }
+
+        if (($next = $this->nextOccurrence()) !== null) {
+            return ['due_on' => $next->due_on, 'expected_on' => $next->expectedOn()];
+        }
+
+        $after = today()->subDay()->toImmutable()->max($this->occurrences->max('due_on') ?? $this->starts_on->subDay());
+        $scheduled = $this->frequency->after($this->starts_on, $after);
+
+        if ($scheduled === null || ($this->ends_on !== null && $scheduled->gt($this->ends_on))) {
+            return null;
+        }
+
+        return ['due_on' => $scheduled, 'expected_on' => $scheduled];
+    }
+
+    /**
      * Bills you pay yourself.
      */
     public function isPaidByHand(): bool
