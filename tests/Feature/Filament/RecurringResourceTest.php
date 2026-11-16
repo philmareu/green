@@ -253,3 +253,34 @@ it('offers reminders on bills and income but not on flex spends', function () {
     expect(RemindersRelationManager::canViewForRecord($comcast, ViewRecurring::class))->toBeTrue()
         ->and(RemindersRelationManager::canViewForRecord($groceries, ViewRecurring::class))->toBeFalse();
 });
+
+it('saves whether a bill is on autopay', function () {
+    Livewire::test(CreateRecurring::class)
+        ->fillForm([
+            'kind' => RecurringKind::Bill->value,
+            'name' => 'Insurance',
+            'account_id' => $this->account->id,
+            'amount' => 120,
+            'frequency' => Frequency::Monthly->value,
+            'starts_on' => '2026-10-28',
+            'autopay' => true,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Recurring::sole()->autopay)->toBeTrue();
+});
+
+it('flags the bills you pay by hand and filters to them', function () {
+    $autopay = Recurring::factory()->for($this->account)->create(['name' => 'Insurance', 'autopay' => true]);
+    $byHand = Recurring::factory()->for($this->account)->create(['name' => 'Water']);
+    $income = Recurring::factory()->for($this->account)->income()->create();
+
+    Livewire::test(ListRecurrings::class)
+        ->assertTableColumnStateSet('autopay', 'Autopay', $autopay)
+        ->assertTableColumnStateSet('autopay', 'Pay by hand', $byHand)
+        ->assertTableColumnStateSet('autopay', null, $income)
+        ->filterTable('autopay', false)
+        ->assertCanSeeTableRecords([$byHand])
+        ->assertCanNotSeeTableRecords([$autopay, $income]);
+});

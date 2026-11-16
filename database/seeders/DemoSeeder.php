@@ -159,8 +159,8 @@ class DemoSeeder extends Seeder
 
         $items = [
             [$personalChecking, RecurringKind::Bill, 'Rent', 1850, Frequency::Monthly, today()->addMonthNoOverflow()->startOfMonth(), []],
-            [$personalChecking, RecurringKind::Bill, 'Comcast', 89, Frequency::Monthly, $monthly(5), ['payee' => 'comcast']],
-            [$personalChecking, RecurringKind::Bill, 'Netflix', 15.49, Frequency::Monthly, $monthly(12), ['payee' => 'netflix']],
+            [$personalChecking, RecurringKind::Bill, 'Comcast', 89, Frequency::Monthly, $monthly(5), ['payee' => 'comcast', 'autopay' => true]],
+            [$personalChecking, RecurringKind::Bill, 'Netflix', 15.49, Frequency::Monthly, $monthly(12), ['payee' => 'netflix', 'autopay' => true]],
             [$personalChecking, RecurringKind::Flex, 'Groceries', 150, Frequency::Weekly, today()->startOfWeek(), ['category_id' => $category('Groceries')]],
             [$personalChecking, RecurringKind::Flex, 'Gas', 60, Frequency::Weekly, today()->startOfWeek(), ['category_id' => $category('Fuel')]],
             [$personalChecking, RecurringKind::Income, 'Owner draw', 2000, Frequency::EveryTwoWeeks, today()->subDays(2), ['payee' => 'owner draw']],

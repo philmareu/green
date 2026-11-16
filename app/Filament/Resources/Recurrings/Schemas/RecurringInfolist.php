@@ -39,6 +39,12 @@ class RecurringInfolist
                             ->label(fn (Recurring $record): string => $isFlex($record) ? 'First period' : 'First due')
                             ->date()
                             ->helperText(fn (Recurring $record): ?string => $record->ends_on ? 'Ends '.$record->ends_on->format('M j, Y') : null),
+                        TextEntry::make('autopay')
+                            ->label('Payment')
+                            ->state(fn (Recurring $record): string => $record->autopay ? 'Autopay' : 'Pay by hand')
+                            ->badge()
+                            ->color(fn (Recurring $record): string => $record->autopay ? 'gray' : 'warning')
+                            ->visible(fn (Recurring $record): bool => $record->kind === RecurringKind::Bill),
                         TextEntry::make('payee')
                             ->label('Payee contains')
                             ->placeholder('Not set: link payments yourself')

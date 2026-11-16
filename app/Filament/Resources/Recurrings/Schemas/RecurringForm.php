@@ -12,6 +12,7 @@ use Carbon\CarbonImmutable;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -92,6 +93,11 @@ class RecurringForm
                 ->label('Ends on')
                 ->afterOrEqual('starts_on')
                 ->helperText('Optional.'),
+            Toggle::make('autopay')
+                ->label('Paid automatically')
+                ->helperText('Off means you pay it yourself, and the lists flag it so it doesn’t slip.')
+                ->visible(fn (Get $get): bool => $get->enum('kind', RecurringKind::class, isNullable: true) === RecurringKind::Bill)
+                ->columnSpanFull(),
             Section::make('Matching')
                 ->description('How Green finds the transaction that paid it.')
                 ->columns(2)

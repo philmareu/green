@@ -11,6 +11,7 @@ use App\Models\Recurring;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Number;
@@ -26,6 +27,16 @@ class RecurringsTable
                     ->weight('medium')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('autopay')
+                    ->label('Payment')
+                    ->state(fn (Recurring $record): ?string => match (true) {
+                        $record->kind !== RecurringKind::Bill => null,
+                        $record->autopay => 'Autopay',
+                        default => 'Pay by hand',
+                    })
+                    ->badge()
+                    ->color(fn (Recurring $record): string => $record->isPaidByHand() ? 'warning' : 'gray')
+                    ->placeholder('—'),
                 TextColumn::make('account.name')
                     ->label('Account')
                     ->formatStateUsing(fn (Recurring $record): string => $record->account->display_name)
@@ -57,6 +68,15 @@ class RecurringsTable
             ->filters([
                 SelectFilter::make('kind')
                     ->options(RecurringKind::class),
+                TernaryFilter::make('autopay')
+                    ->label('Payment')
+                    ->placeholder('All')
+                    ->trueLabel('Autopay bills')
+                    ->falseLabel('Bills you pay by hand')
+                    ->queries(
+                        true: fn (Builder $query) => $query->where('kind', RecurringKind::Bill)->where('autopay', true),
+                        false: fn (Builder $query) => $query->where('kind', RecurringKind::Bill)->where('autopay', false),
+                    ),
                 SelectFilter::make('account_id')
                     ->label('Account')
                     ->options(fn (): array => Account::query()
