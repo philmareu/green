@@ -22,7 +22,9 @@ use Illuminate\Support\Number;
  * - Unpaid bills past their due date count today: better to plan for them.
  * - Late income counts until its match window passes, then it's left out.
  * - A flex spend reserves what's left of this period today, and its full
- *   budget at the start of each later period.
+ *   budget at the start of each later period. One that rolls over counts
+ *   what rolled over into this period, and takes any overspending out of the
+ *   periods after it; later periods are assumed to use their whole budget.
  */
 class ForecastBalance
 {
@@ -38,12 +40,13 @@ class ForecastBalance
             $recurring->syncOccurrences($until->max($today->addDays(Recurring::HORIZON_DAYS)));
 
             $occurrences = $recurring->occurrences()->expectedBy($until)->get();
+            $overspent = 0.0;
 
             foreach ($occurrences as $occurrence) {
                 $occurrence->setRelation('recurring', $recurring);
 
                 $line = $recurring->kind === RecurringKind::Flex
-                    ? $this->flexLine($occurrence, $today, $account->currency)
+                    ? $this->flexLine($occurrence, $today, $account->currency, $overspent)
                     : $this->dueLine($occurrence, $today);
 
                 if ($line !== null) {
@@ -94,9 +97,10 @@ class ForecastBalance
     }
 
     /**
+     * @param  float  $overspent  This period's overspending that rolls into the next ones.
      * @return array<string, mixed>|null
      */
-    protected function flexLine(Occurrence $occurrence, CarbonImmutable $today, string $currency): ?array
+    protected function flexLine(Occurrence $occurrence, CarbonImmutable $today, string $currency, float &$overspent): ?array
     {
         $recurring = $occurrence->recurring;
         $periodEnd = $occurrence->periodEnd() ?? $occurrence->due_on->addDay();
@@ -106,11 +110,23 @@ class ForecastBalance
         }
 
         if ($occurrence->due_on->gt($today)) {
-            return $this->line($occurrence, $occurrence->due_on, (float) $recurring->amount, 'Budget until '.$periodEnd->subDay()->format('M j'));
+            $amount = (float) $recurring->amount;
+            $reserve = max(0.0, round($amount - $overspent, 2));
+            $note = 'Budget until '.$periodEnd->subDay()->format('M j');
+
+            if ($reserve < $amount) {
+                $note .= ', less '.Number::currency($amount - $reserve, $currency).' overspent';
+            }
+
+            $overspent = max(0.0, round($overspent - $amount, 2));
+
+            return $reserve > 0 ? $this->line($occurrence, $occurrence->due_on, $reserve, $note) : null;
         }
 
         $spent = $occurrence->spent();
-        $left = max(0.0, round((float) $recurring->amount - $spent, 2));
+        $budget = $occurrence->budget();
+        $left = max(0.0, round($budget - $spent, 2));
+        $overspent = $recurring->rolls_over ? max(0.0, round($spent - $budget, 2)) : 0.0;
 
         if ($left <= 0) {
             return null;
@@ -119,7 +135,7 @@ class ForecastBalance
         return $this->line($occurrence, $today, $left, sprintf(
             '%s of %s spent so far',
             Number::currency($spent, $currency),
-            Number::currency((float) $recurring->amount, $currency),
+            Number::currency($budget, $currency),
         ));
     }
 
