@@ -57,6 +57,9 @@ class Recurring extends Model
     /** How far back to look for payments made before the item was added. */
     public const int HISTORY_DAYS = 90;
 
+    /** A flex spend warns once its period's spending reaches this share of the budget. */
+    public const int BUDGET_WARNING_PERCENT = 80;
+
     /** Fields that change which transactions an item matches. */
     public const array MATCH_FIELDS = ['account_id', 'kind', 'amount', 'frequency', 'starts_on', 'ends_on', 'payee', 'amount_tolerance'];
 
