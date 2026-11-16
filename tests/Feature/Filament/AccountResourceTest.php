@@ -3,6 +3,7 @@
 use App\Enums\Frequency;
 use App\Enums\RecurringKind;
 use App\Filament\Actions\PlaidActions;
+use App\Filament\Pages\Forecast;
 use App\Filament\Resources\Accounts\AccountResource;
 use App\Filament\Resources\Accounts\Pages\EditAccount;
 use App\Filament\Resources\Accounts\Pages\ListAccounts;
@@ -13,6 +14,7 @@ use App\Filament\Resources\Books\BookResource;
 use App\Filament\Resources\Books\Pages\ViewBook;
 use App\Filament\Resources\Books\RelationManagers\AccountsRelationManager;
 use App\Filament\Resources\PlaidItems\PlaidItemResource;
+use App\Filament\Widgets\Forecast\ForecastStats;
 use App\Models\Account;
 use App\Models\Book;
 use App\Models\Category;
@@ -335,3 +337,36 @@ it('edits a recurring item from the account page and keeps it on the account', f
         ->amount->toEqual('95.0000')
         ->account_id->toBe($account->id);
 });
+
+it('opens the forecast with the account already selected', function () {
+    Account::factory()->for($this->item)->create(['book_id' => $this->book->id, 'name' => 'Already Checking']);
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id, 'name' => 'Everyday Checking']);
+
+    Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertActionHasUrl('viewForecast', Forecast::getUrl(['filters' => ['account' => $account->id]]));
+
+    Livewire::withQueryParams(['filters' => ['account' => (string) $account->id]])
+        ->test(Forecast::class)
+        ->assertSet('filters.account', (string) $account->id)
+        ->assertSet('filters.weeks', ForecastStats::DEFAULT_WEEKS);
+});
+
+it('keeps the weeks last chosen when a link names only the account', function () {
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id]);
+    Livewire::test(Forecast::class)->set('filters.weeks', 12);
+
+    Livewire::withQueryParams(['filters' => ['account' => (string) $account->id]])
+        ->test(Forecast::class)
+        ->assertSet('filters.account', (string) $account->id)
+        ->assertSet('filters.weeks', 12);
+});
+
+it('offers no forecast for a credit card or a hidden account', function (array $attributes) {
+    $account = Account::factory()->for($this->item)->create(['book_id' => $this->book->id, ...$attributes]);
+
+    Livewire::test(ViewAccount::class, ['record' => $account->getRouteKey()])
+        ->assertActionHidden('viewForecast');
+})->with([
+    'credit card' => [['type' => 'credit']],
+    'hidden' => [['is_hidden' => true]],
+]);

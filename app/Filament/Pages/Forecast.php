@@ -19,7 +19,9 @@ use Filament\Support\Icons\Heroicon;
  */
 class Forecast extends Dashboard
 {
-    use HasFiltersForm;
+    use HasFiltersForm {
+        mountHasFilters as mountFilters;
+    }
 
     protected static string $routePath = 'forecast';
 
@@ -28,6 +30,22 @@ class Forecast extends Dashboard
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPresentationChartLine;
 
     protected static ?int $navigationSort = 0;
+
+    /**
+     * A link can name just the account (`?filters[account]=`, from an
+     * account's page); the weeks then stay as last chosen.
+     */
+    public function mountHasFilters(): void
+    {
+        if ($this->filters) {
+            $this->filters = [
+                'weeks' => data_get(session($this->getFiltersSessionKey()), 'weeks') ?? ForecastStats::DEFAULT_WEEKS,
+                ...$this->filters,
+            ];
+        }
+
+        $this->mountFilters();
+    }
 
     public function filtersForm(Schema $schema): Schema
     {
