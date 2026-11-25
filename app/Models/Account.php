@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
 #[Fillable([
     'plaid_item_id',
@@ -36,6 +37,23 @@ class Account extends Model
 
     protected static function booted(): void
     {
+        // A Book lists and syncs every account in it, so an account may only
+        // sit in a Book of the user who owns its bank connection.
+        static::saving(function (Account $account): void {
+            if ($account->book_id === null || ! $account->isDirty(['book_id', 'plaid_item_id'])) {
+                return;
+            }
+
+            $ownsBook = Book::query()
+                ->whereKey($account->book_id)
+                ->where('user_id', PlaidItem::query()->whereKey($account->plaid_item_id)->value('user_id'))
+                ->exists();
+
+            if (! $ownsBook) {
+                throw new InvalidArgumentException('That Book belongs to another user.');
+            }
+        });
+
         // A different Book can mean a different category set.
         static::updated(function (Account $account): void {
             if ($account->wasChanged('book_id')) {

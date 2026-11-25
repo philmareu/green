@@ -8,6 +8,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
+use SensitiveParameter;
 
 /**
  * A thin client for the handful of Plaid endpoints Green needs.
@@ -79,7 +80,7 @@ class PlaidClient
     /**
      * @return array{access_token: string, item_id: string, request_id: string}
      */
-    public function exchangePublicToken(string $publicToken): array
+    public function exchangePublicToken(#[SensitiveParameter] string $publicToken): array
     {
         return $this->post('/item/public_token/exchange', ['public_token' => $publicToken]);
     }
@@ -89,7 +90,7 @@ class PlaidClient
      *
      * @return array{accounts: list<array<string, mixed>>, item: array<string, mixed>}
      */
-    public function getAccounts(string $accessToken): array
+    public function getAccounts(#[SensitiveParameter] string $accessToken): array
     {
         return $this->post('/accounts/get', ['access_token' => $accessToken]);
     }
@@ -100,7 +101,7 @@ class PlaidClient
      * @param  list<string>  $accountIds
      * @return array{accounts: list<array<string, mixed>>, item: array<string, mixed>}
      */
-    public function getBalances(string $accessToken, array $accountIds = []): array
+    public function getBalances(#[SensitiveParameter] string $accessToken, array $accountIds = []): array
     {
         $payload = ['access_token' => $accessToken];
 
@@ -116,7 +117,7 @@ class PlaidClient
      *
      * @return array{added: list<array<string, mixed>>, modified: list<array<string, mixed>>, removed: list<array{transaction_id: string}>, accounts: list<array<string, mixed>>, next_cursor: string, has_more: bool, transactions_update_status?: string}
      */
-    public function syncTransactions(string $accessToken, ?string $cursor = null, int $count = 500): array
+    public function syncTransactions(#[SensitiveParameter] string $accessToken, ?string $cursor = null, int $count = 500): array
     {
         $payload = [
             'access_token' => $accessToken,
@@ -135,7 +136,7 @@ class PlaidClient
     /**
      * @return array{item: array<string, mixed>}
      */
-    public function getItem(string $accessToken): array
+    public function getItem(#[SensitiveParameter] string $accessToken): array
     {
         return $this->post('/item/get', ['access_token' => $accessToken]);
     }
@@ -151,7 +152,7 @@ class PlaidClient
         ]);
     }
 
-    public function removeItem(string $accessToken): array
+    public function removeItem(#[SensitiveParameter] string $accessToken): array
     {
         return $this->post('/item/remove', ['access_token' => $accessToken]);
     }
@@ -206,7 +207,7 @@ class PlaidClient
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
-    protected function post(string $endpoint, array $payload): array
+    protected function post(string $endpoint, #[SensitiveParameter] array $payload): array
     {
         if (! $this->isConfigured()) {
             throw PlaidException::notConfigured();
@@ -232,7 +233,13 @@ class PlaidClient
             throw PlaidException::fromResponse($response);
         }
 
-        return $response->json();
+        $body = $response->json();
+
+        if (! is_array($body)) {
+            throw PlaidException::unreadable($response);
+        }
+
+        return $body;
     }
 
     protected function capture(string $endpoint, ?int $status, mixed $requestId, mixed $errorCode): void

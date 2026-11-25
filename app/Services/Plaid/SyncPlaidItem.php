@@ -181,6 +181,8 @@ class SyncPlaidItem
             ];
         }
 
+        $rows = $this->withoutIdsStoredElsewhere($accountIds, $rows);
+
         if ($rows === []) {
             return 0;
         }
@@ -192,6 +194,42 @@ class SyncPlaidItem
         );
 
         return count($rows);
+    }
+
+    /**
+     * The upsert finds rows by Plaid's transaction id alone, so an id already
+     * stored under another Item's account would move that transaction here.
+     * Plaid's ids are unique, so this should never happen; skip such rows
+     * rather than trust that.
+     *
+     * @param  array<string, int>  $accountIds  Plaid account id => local account id
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    protected function withoutIdsStoredElsewhere(array $accountIds, array $rows): array
+    {
+        if ($rows === []) {
+            return [];
+        }
+
+        $storedElsewhere = Transaction::query()
+            ->whereIn('plaid_transaction_id', array_column($rows, 'plaid_transaction_id'))
+            ->whereNotIn('account_id', array_values($accountIds))
+            ->pluck('plaid_transaction_id')
+            ->all();
+
+        if ($storedElsewhere === []) {
+            return $rows;
+        }
+
+        Log::warning('Plaid transaction ids are already stored under another bank connection; skipping.', [
+            'transaction_ids' => $storedElsewhere,
+        ]);
+
+        return array_values(array_filter(
+            $rows,
+            fn (array $row): bool => ! in_array($row['plaid_transaction_id'], $storedElsewhere, true),
+        ));
     }
 
     /**
@@ -217,6 +255,7 @@ class SyncPlaidItem
             ->whereNotNull('category_id')
             ->get(['plaid_transaction_id', 'category_id'])
             ->each(fn (Transaction $pending) => Transaction::query()
+                ->whereIn('account_id', $accountIds)
                 ->where('plaid_transaction_id', $postedByPendingId[$pending->plaid_transaction_id])
                 ->where(fn ($query) => $query->whereNull('category_id')->orWhere('category_source', CategorySource::Suggested))
                 ->update(['category_id' => $pending->category_id, 'category_source' => CategorySource::Manual]));

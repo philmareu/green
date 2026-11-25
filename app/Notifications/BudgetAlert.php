@@ -44,7 +44,7 @@ class BudgetAlert extends Notification implements ShouldQueue
         $currency = $this->recurring->account?->currency ?? 'USD';
 
         return FilamentNotification::make()
-            ->title($this->headline())
+            ->title(e($this->headline()))
             ->body(sprintf(
                 '%s of %s spent, %s.',
                 Number::currency($this->spent, $currency),
@@ -69,7 +69,7 @@ class BudgetAlert extends Notification implements ShouldQueue
         return (new MailMessage)
             ->subject($this->headline())
             ->line("{$this->headline()}, {$this->periodLine()}.")
-            ->action('View '.$this->recurring->name, $this->recurringUrl());
+            ->action('View budget', $this->recurringUrl());
     }
 
     protected function isOver(): bool

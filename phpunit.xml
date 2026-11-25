@@ -32,7 +32,6 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
-        <env name="LOGIN_LINK_ENABLED" value="false"/>
         <env name="PLAID_CLIENT_ID" value="test-client-id"/>
         <env name="PLAID_SECRET" value="test-secret"/>
         <env name="PLAID_ENV" value="sandbox"/>

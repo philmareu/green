@@ -130,7 +130,8 @@ it('counts each account’s recurring items, not someone else’s, and links to 
     $none = Account::factory()->for($this->item)->create(['name' => 'Ally Savings']);
     Recurring::factory()->for($account)->create();
     Recurring::factory()->for($account)->income()->create();
-    Recurring::factory()->for($account)->for(User::factory())->create();
+    // The model refuses an item on someone else's account, so write this one past it.
+    Recurring::withoutEvents(fn () => Recurring::factory()->for($account)->for(User::factory())->create());
     $recurringTab = AccountResource::getUrl('view', ['record' => $account, 'relation' => 'recurring']);
 
     Livewire::test(ListAccounts::class)

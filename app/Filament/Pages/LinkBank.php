@@ -131,14 +131,14 @@ class LinkBank extends Page
     {
         $this->errorMessage = $message ?: 'Plaid Link closed with an error'.($code ? " ({$code})." : '.');
 
-        Notification::make()->title('Bank link failed')->body($this->errorMessage)->danger()->send();
+        Notification::make()->title('Bank link failed')->body(e($this->errorMessage))->danger()->send();
     }
 
     protected function finish(string $title, string $body, string $redirectTo): void
     {
         session()->forget(['plaid.link.token', 'plaid.link.return_url', 'plaid.link.received_redirect_uri']);
 
-        Notification::make()->title($title)->body($body)->success()->send();
+        Notification::make()->title(e($title))->body(e($body))->success()->send();
 
         $this->redirect($redirectTo, navigate: true);
     }

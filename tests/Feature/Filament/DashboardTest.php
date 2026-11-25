@@ -24,6 +24,13 @@ it('renders the dashboard', function () {
     $this->get('/')->assertOk()->assertSee('Books');
 });
 
+it('draws the avatar itself instead of asking another site for it', function () {
+    $this->get('/')
+        ->assertOk()
+        ->assertSee('data:image/svg+xml;base64,', false)
+        ->assertDontSee('ui-avatars.com', false);
+});
+
 it('shows a card per Book with cash available', function () {
     $book = Book::factory()->for($this->user)->create(['name' => 'Acme LLC']);
     Account::factory()->inBook($book)->create(['available_balance' => 1234.56]);

@@ -7,7 +7,6 @@ use App\Models\Category;
 use App\Models\Recurring;
 use App\Models\Reminder;
 use App\Models\Transaction;
-use App\Models\User;
 use App\Notifications\RecurringReminder;
 use App\Services\Notifications\SendReminders;
 use Illuminate\Notifications\Events\NotificationSending;
@@ -113,8 +112,9 @@ it('leaves out flex spends', function () {
 
 it('keeps a reminder while its owner has reminders turned off, and sends it once they turn them on', function () {
     Notification::fake();
-    $user = User::factory()->create(['notification_preferences' => ['reminder' => []]]);
-    $comcast = comcastBill(['user_id' => $user->id]);
+    $comcast = comcastBill();
+    $user = $comcast->user;
+    $user->forceFill(['notification_preferences' => ['reminder' => []]])->save();
     $reminder = Reminder::factory()->for($comcast)->create(['days_before' => 3]);
 
     expect(sendReminders('2026-10-12'))->toBe(0)
@@ -141,6 +141,26 @@ it('puts the note, due date and amount in the bell, and leaves the amount out of
         ->toContain('Cancel before it renews')
         ->toContain('Netflix is due Thu, Oct 15')
         ->not->toContain('15.49');
+});
+
+it('shows markup in a name or note as text, in the bell and in the email', function () {
+    $name = '<a href="https://evil.example/pay">Netflix</a>';
+    $note = '<img src="https://evil.example/pixel.png"> [Sign in](https://evil.example/login)';
+    $bill = comcastBill(['name' => $name]);
+    Reminder::factory()->for($bill)->create(['days_before' => 3, 'note' => $note]);
+
+    sendReminders('2026-10-12');
+
+    expect($bill->user->notifications()->sole()->data)
+        ->title->toBe(e($note))
+        ->body->toStartWith(e($name));
+
+    $mail = (string) (new RecurringReminder($bill, $bill->occurrences()->first(), $note))->toMail($bill->user)->render();
+
+    expect($mail)
+        ->toContain('Netflix')
+        ->not->toContain('<img src="https://evil.example')
+        ->not->toContain('<a href="https://evil.example');
 });
 
 it('names the due date in the title when there is no note', function () {

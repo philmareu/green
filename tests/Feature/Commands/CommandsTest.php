@@ -5,6 +5,7 @@ use App\Models\Book;
 use App\Models\PlaidItem;
 use App\Models\User;
 use App\Services\Plaid\PlaidClient;
+use Database\Seeders\DemoSeeder;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -19,6 +20,15 @@ it('queues a sync for every connection that can sync', function () {
     Queue::assertPushed(SyncPlaidItemJob::class, 2);
     Queue::assertPushed(SyncPlaidItemJob::class, fn ($job) => $job->item->is($active));
     Queue::assertPushed(SyncPlaidItemJob::class, fn ($job) => $job->item->is($errored));
+});
+
+it('leaves the demo’s banks out of the scheduled sync', function () {
+    Queue::fake();
+    PlaidItem::factory()->create(['plaid_item_id' => DemoSeeder::ITEM_PREFIX.'first-platypus-bank']);
+
+    $this->artisan('plaid:sync')->assertSuccessful();
+
+    Queue::assertNothingPushed();
 });
 
 it('can sync a single connection', function () {
@@ -66,4 +76,25 @@ it('installs and creates the first login', function () {
         ->assertSuccessful();
 
     expect(User::where('email', 'phil@example.com')->exists())->toBeTrue();
+});
+
+it('refuses a short password or an email that is already a login', function (array $options) {
+    User::factory()->create(['email' => 'taken@example.com']);
+
+    $this->artisan('green:install', ['--name' => 'Someone', ...$options])->assertFailed();
+
+    expect(User::count())->toBe(1);
+})->with([
+    'short password' => [['--email' => 'new@example.com', '--password' => 'short']],
+    'email in use' => [['--email' => 'taken@example.com', '--password' => 'secret-password']],
+]);
+
+it('will not add a real login beside the demo login', function () {
+    User::factory()->create(['email' => DemoSeeder::EMAIL]);
+
+    $this->artisan('green:install', ['--name' => 'Someone', '--email' => 'new@example.com', '--password' => 'secret-password'])
+        ->expectsOutputToContain('php artisan migrate:fresh')
+        ->assertFailed();
+
+    expect(User::count())->toBe(1);
 });

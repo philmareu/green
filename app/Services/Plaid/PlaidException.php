@@ -48,6 +48,20 @@ class PlaidException extends RuntimeException
         );
     }
 
+    /**
+     * A successful status with a body that isn't JSON, as a proxy or an
+     * outage page in front of Plaid can send.
+     */
+    public static function unreadable(Response $response): self
+    {
+        return new self(
+            "Plaid sent a reply Green could not read (HTTP {$response->status()}).",
+            errorType: 'API_ERROR',
+            errorCode: 'UNREADABLE_RESPONSE',
+            status: $response->status(),
+        );
+    }
+
     public static function notConfigured(): self
     {
         return new self(

@@ -112,6 +112,21 @@ it('does not let you link into someone else’s Book', function () {
         ->assertNotFound();
 });
 
+it('does not take over a bank connection that belongs to someone else', function () {
+    fakeLinkFlow();
+    $theirs = PlaidItem::factory()->create(['plaid_item_id' => 'item-new']);
+
+    expect(fn () => Livewire::withQueryParams(['book' => $this->book->id])
+        ->test(LinkBank::class)
+        ->call('exchange', 'public-sandbox-xyz', 'ins_109508', 'First Platypus Bank'))
+        ->toThrow(InvalidArgumentException::class, 'That bank connection belongs to another user.');
+
+    expect($theirs->fresh())
+        ->user_id->toBe($theirs->user_id)
+        ->access_token->toBe($theirs->access_token)
+        ->and(PlaidItem::query()->ownedBy($this->book->user)->count())->toBe(0);
+});
+
 it('explains when Plaid is not configured', function () {
     config()->set('services.plaid.secret', null);
     app()->forgetInstance(PlaidClient::class);

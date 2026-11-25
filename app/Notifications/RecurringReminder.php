@@ -42,9 +42,9 @@ class RecurringReminder extends Notification implements ShouldQueue
     public function toDatabase(User $notifiable): array
     {
         return FilamentNotification::make()
-            ->title($this->note ?? $this->dueLine())
+            ->title(e($this->note ?? $this->dueLine()))
             ->body($this->note !== null
-                ? $this->dueLine().' · '.$this->amount()
+                ? e($this->dueLine()).' · '.$this->amount()
                 : $this->amount())
             ->info()
             ->icon(Heroicon::OutlinedBellAlert)
@@ -65,7 +65,7 @@ class RecurringReminder extends Notification implements ShouldQueue
             ->subject("Reminder: {$this->recurring->name}")
             ->when($this->note !== null, fn (MailMessage $mail) => $mail->line($this->note))
             ->line($this->dueLine().'.')
-            ->action('View '.$this->recurring->name, $this->recurringUrl());
+            ->action($this->recurring->kind === RecurringKind::Income ? 'View income' : 'View bill', $this->recurringUrl());
     }
 
     /**

@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
 /**
  * Money you expect to move: a bill, a flex spend (a budget per period, such as
@@ -63,11 +64,36 @@ class Recurring extends Model
     /** A flex spend warns once its period's spending reaches this share of the budget. */
     public const int BUDGET_WARNING_PERCENT = 80;
 
+    /**
+     * The earliest first due date the forms accept. Due dates are counted
+     * from the first one, so a mistyped year (1026 for 2026) would otherwise
+     * add seconds to every sync.
+     */
+    public const string EARLIEST_START = '2000-01-01';
+
     /** Fields that change which transactions an item matches. */
     public const array MATCH_FIELDS = ['account_id', 'kind', 'amount', 'frequency', 'starts_on', 'ends_on', 'payee', 'amount_tolerance'];
 
     protected static function booted(): void
     {
+        // The forecast, the matcher and the budget alerts find an item through
+        // its account alone, so an item on someone else's account would read
+        // that person's transactions.
+        static::saving(function (Recurring $recurring): void {
+            if ($recurring->account_id === null || ! $recurring->isDirty(['account_id', 'user_id'])) {
+                return;
+            }
+
+            $ownsAccount = Account::query()
+                ->whereKey($recurring->account_id)
+                ->whereRelation('plaidItem', 'user_id', $recurring->user_id)
+                ->exists();
+
+            if (! $ownsAccount) {
+                throw new InvalidArgumentException('That account belongs to another user.');
+            }
+        });
+
         static::saved(function (Recurring $recurring): void {
             if ($recurring->wasRecentlyCreated || $recurring->wasChanged(self::MATCH_FIELDS)) {
                 app(MatchRecurringTransactions::class)->forRecurring($recurring);
