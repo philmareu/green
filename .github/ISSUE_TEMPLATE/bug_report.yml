@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in Green is broken or shows the wrong numbers.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Issues are public. Don't paste bank data.** Leave out account numbers, real transactions, Plaid tokens, anything from your `.env`, and logs you haven't read through and redacted. Made-up names and amounts are fine.
+
+        Found a security problem? Don't file it here. [Report it privately](https://github.com/philmareu/green/security/advisories/new) instead.
+
+        Bug reports are welcome. I maintain Green alone in my spare time, so a report may sit for a while before I get to it. This form is for bugs in Green itself: I can't help with setting up a Plaid account or hosting PHP.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did and what Green showed. Add the error message if there was one. For a sync or bank connection problem, add the error from the Plaid Activity page, such as `ITEM_LOGIN_REQUIRED`.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest path from a working Green to the problem. Say so if it also happens with the demo data.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Green version
+      description: The commit you're running. `git rev-parse --short HEAD` prints it.
+      placeholder: a1b2c3d
+  - type: input
+    id: php
+    attributes:
+      label: PHP version
+      description: From `php -v`.
+      placeholder: 8.5.12
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - SQLite
+        - MySQL or MariaDB
+        - PostgreSQL
+  - type: input
+    id: hosting
+    attributes:
+      label: How it's hosted
+      placeholder: php artisan serve on my laptop, Laravel Forge with nginx, Docker, ...
+  - type: dropdown
+    id: plaid-environment
+    attributes:
+      label: Plaid environment
+      options:
+        - Sandbox
+        - Production
+        - None (demo data only)

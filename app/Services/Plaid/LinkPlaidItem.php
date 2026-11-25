@@ -62,18 +62,21 @@ class LinkPlaidItem
             $institutionName = $this->plaid->getInstitution($institutionId)['institution']['name'] ?? null;
         }
 
-        $item = PlaidItem::query()->updateOrCreate(
-            ['plaid_item_id' => $exchange['item_id']],
-            [
-                'user_id' => $user->getKey(),
-                'access_token' => $accessToken,
-                'institution_id' => $institutionId,
-                'institution_name' => $institutionName,
-                'status' => PlaidItemStatus::Active,
-                'error_code' => null,
-                'error_message' => null,
-            ],
-        );
+        $item = PlaidItem::query()->firstOrNew(['plaid_item_id' => $exchange['item_id']]);
+
+        if ($item->exists && $item->user_id !== $user->getKey()) {
+            throw new InvalidArgumentException('That bank connection belongs to another user.');
+        }
+
+        $item->fill([
+            'user_id' => $user->getKey(),
+            'access_token' => $accessToken,
+            'institution_id' => $institutionId,
+            'institution_name' => $institutionName,
+            'status' => PlaidItemStatus::Active,
+            'error_code' => null,
+            'error_message' => null,
+        ])->save();
 
         $log->forItem($item);
 

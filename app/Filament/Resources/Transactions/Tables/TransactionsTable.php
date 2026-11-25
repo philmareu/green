@@ -210,7 +210,7 @@ class TransactionsTable
                 $changed = $categorize->forCategorySet($set);
 
                 Notification::make()
-                    ->title("“{$data['payee']}” now goes in {$category->full_name}")
+                    ->title(e("“{$data['payee']}” now goes in {$category->full_name}"))
                     ->body(Str::plural('transaction', $changed, prependCount: true).' changed. New ones get it after each sync.')
                     ->success()
                     ->send();

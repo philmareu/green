@@ -26,8 +26,8 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - `composer test` (Pest; all Plaid HTTP is faked, `Http::preventStrayRequests()` is on). Fixtures: `plaidAccount()`, `plaidTransaction()`, `syncPage()`, `plaidError()` in `tests/Pest.php`.
 - `vendor/bin/pint` before committing.
 - `php artisan plaid:sync [--item=]` (scheduled hourly), `php artisan reminders:send` (scheduled daily at 08:00), `php artisan plaid:sandbox-link {book}`, `php artisan green:install`.
-- `php artisan db:seed --class=DemoSeeder` loads sample data (login `test@example.com` / `password`).
-- `LOGIN_LINK_ENABLED=true` in a local `.env` adds a "Log in as" button per user to the login page (`spatie/laravel-login-link`, a dev dependency; `config/login-link.php`, render hook in `AdminPanelProvider`). It needs `APP_ENV=local` too, and stays off by default because a server installed from `.env.example` also runs as `local`.
+- `php artisan migrate --seed` on a new database, or `php artisan db:seed` on a migrated one, loads the demo (login `test@example.com` / `password`): Books, banks, about 90 days of transactions, recurring items, alerts and Plaid activity, all dated from today. `--class=DemoSeeder` does the same. It refuses (an exception, nothing written) in production, when the database has any other login, or once a real bank is linked to the demo login; otherwise a re-run rebuilds what the demo login owns and keeps the login. `database/seeders/DemoSeeder.php` builds it from the rows in `DemoStatements.php` through the app's own services and model events, so `DatabaseSeeder` must not use `WithoutModelEvents`.
+- `.env.example` ships `APP_ENV=production` and `APP_DEBUG=false` for servers; `composer setup` writes `local` and `true` into the `.env` it creates.
 
 ## Gotchas
 
@@ -37,9 +37,11 @@ Self-hosted, open-source finance viewer. Users group bank accounts into **Books*
 - Eloquent writes `date` casts with a time part on SQLite, while Plaid upserts write plain dates. Compare dates with `whereDate()` or `date(...)` in SQL, never with string equality.
 - "Today", "overdue" and the forecast use `APP_TIMEZONE` (default UTC).
 - `Recurring::orderByNextDue()` (the Recurring lists' default sort) and the `overdue()` scopes on `Recurring` and `Occurrence` (the red Recurring badges) repeat `Recurring::nextOccurrence()` and `Occurrence::status()` in SQL. Change them together; `tests/Feature/Recurring/RecurringTest.php` and `OccurrenceTest.php` check that they agree.
+- `Recurring`, `Account` and `Book` refuse (an `InvalidArgumentException` on save) an account, Book or category set that belongs to another user, because several queries find rows through an account or a Book alone. A test that needs such a row has to write it with `withoutEvents()`.
+- `plaid:sync` skips bank connections whose `plaid_item_id` starts with `DemoSeeder::ITEM_PREFIX`, and `green:install` refuses while the demo login exists.
 - `/privacy` (`resources/views/privacy.blade.php`, public, linked from sign-in and Link bank) lists what Green stores and shares. Update it and its "Last updated" date when either changes.
 - Sign-in uses Filament's authenticator-app MFA with recovery codes (`users.app_authentication_secret` and `app_authentication_recovery_codes`, both encrypted), required only when `APP_ENV=production`. Filament evaluates that when it registers routes, so a `route:cache` built outside production leaves MFA optional.
-- `spatie/laravel-login-link` is a dev dependency, and production installs with `--no-dev`. Never use `<x-login-link>` or the package's classes in a view file or in code that runs in production: `php artisan optimize` compiles every view file on deploy and fails.
+- Production installs with `--no-dev`, and `php artisan optimize` compiles every view file on deploy. A view file, or code that runs in production, that uses a dev dependency's component or class makes the deploy fail.
 
 <laravel-boost-guidelines>
 === foundation rules ===

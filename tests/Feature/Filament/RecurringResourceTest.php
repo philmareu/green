@@ -150,6 +150,15 @@ it('refuses someone else’s account, and a flex spend without a category', func
     expect(Recurring::count())->toBe(0);
 });
 
+it('refuses a first due date with a mistyped year', function () {
+    Livewire::test(CreateRecurring::class)
+        ->fillForm(['name' => 'Rent', 'account_id' => $this->account->id, 'amount' => 900, 'starts_on' => '1026-11-01'])
+        ->call('create')
+        ->assertHasFormErrors(['starts_on']);
+
+    expect(Recurring::count())->toBe(0);
+});
+
 it('unlinks a payment for good, and marks a due date paid', function () {
     $payment = comcastPayment($this->account, '2026-10-15');
     $comcast = Recurring::factory()->for($this->account)->create(['starts_on' => '2026-10-15']);

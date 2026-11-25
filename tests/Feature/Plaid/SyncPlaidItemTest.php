@@ -198,6 +198,17 @@ it('flags items that need the user to log in again', function () {
         ->and($item->error_message)->toBe('Sign in to your bank again.');
 });
 
+it('records a reply that is not JSON as a failed sync', function () {
+    fakeSyncPages(['body' => '<html>Bad gateway</html>', 'status' => 200]);
+
+    $result = sync($this->item);
+
+    expect($result->successful)->toBeFalse()
+        ->and($this->item->fresh())
+        ->error_code->toBe('UNREADABLE_RESPONSE')
+        ->sync_cursor->toBeNull();
+});
+
 it('refreshes balances and adds new accounts as unassigned without renaming existing ones', function () {
     $this->account->update(['name' => 'Ops Checking']);
 
@@ -235,6 +246,23 @@ it('never touches another item’s transactions', function () {
     sync($this->item);
 
     expect($other->fresh())->not->toBeNull();
+});
+
+it('leaves another item’s transaction alone when Plaid repeats its id', function () {
+    $other = Transaction::factory()->create(['plaid_transaction_id' => 'tx-other', 'name' => 'Theirs']);
+
+    fakeSyncPages(syncPage(added: [
+        plaidTransaction(['transaction_id' => 'tx-other', 'name' => 'Overwritten']),
+        plaidTransaction(['transaction_id' => 'tx-mine']),
+    ]));
+
+    $result = sync($this->item);
+
+    expect($other->fresh())
+        ->account_id->toBe($other->account_id)
+        ->name->toBe('Theirs')
+        ->and($this->account->transactions()->pluck('plaid_transaction_id')->all())->toBe(['tx-mine'])
+        ->and($result->added)->toBe(1);
 });
 
 it('authenticates sync requests with the item’s access token', function () {

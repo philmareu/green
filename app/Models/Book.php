@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 #[Fillable(['user_id', 'name', 'kind', 'category_set_id'])]
 class Book extends Model
@@ -23,6 +24,23 @@ class Book extends Model
 
     protected static function booted(): void
     {
+        // A Book's transactions take their categories from its set, so the
+        // set has to be the same user's.
+        static::saving(function (Book $book): void {
+            if ($book->category_set_id === null || ! $book->isDirty(['category_set_id', 'user_id'])) {
+                return;
+            }
+
+            $ownsSet = CategorySet::query()
+                ->whereKey($book->category_set_id)
+                ->where('user_id', $book->user_id)
+                ->exists();
+
+            if (! $ownsSet) {
+                throw new InvalidArgumentException('That category set belongs to another user.');
+            }
+        });
+
         static::updated(function (Book $book): void {
             if ($book->wasChanged('category_set_id')) {
                 app(CategorizeTransactions::class)->handle(Transaction::query()->whereIn('account_id', $book->accounts()->select('id')));

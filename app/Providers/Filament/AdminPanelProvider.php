@@ -2,8 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\AvatarProviders\InitialsAvatarProvider;
 use App\Filament\Pages\NotificationPreferences;
-use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
@@ -36,6 +36,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('Green')
             ->login()
             ->profile()
+            ->defaultAvatarProvider(InitialsAvatarProvider::class)
             ->databaseNotifications()
             ->userMenuItems([
                 Action::make('notifications')
@@ -73,7 +74,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): string => $this->loginLinks().$this->privacyLink());
+            ->renderHook(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER, fn (): string => $this->privacyLink());
     }
 
     protected function privacyLink(): string
@@ -83,27 +84,5 @@ class AdminPanelProvider extends PanelProvider
                 <x-filament::link :href="route('privacy')" color="gray">Privacy policy</x-filament::link>
             </p>
             BLADE);
-    }
-
-    /**
-     * One-click "Log in as" buttons for local development, when
-     * LOGIN_LINK_ENABLED is on (spatie/laravel-login-link, a dev dependency).
-     *
-     * Rendered from a string rather than a view file: `php artisan view:cache`
-     * compiles every view file on deploy, where the package isn't installed.
-     */
-    protected function loginLinks(): string
-    {
-        if (! app()->environment(config('login-link.allowed_environments', []))) {
-            return '';
-        }
-
-        return Blade::render(<<<'BLADE'
-            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                @foreach ($users as $user)
-                    <x-login-link :email="$user->email" :label="'Log in as '.$user->email" />
-                @endforeach
-            </div>
-            BLADE, ['users' => User::query()->orderBy('id')->get()]);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\Plaid\PlaidClient;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -20,6 +21,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Account, bill and bank names come from Plaid or a form and end up in
+        // alert emails: keep HTML and Markdown links in them from rendering.
+        Markdown::withSecuredEncoding();
     }
 }

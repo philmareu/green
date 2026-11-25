@@ -8,7 +8,6 @@ use App\Models\Category;
 use App\Models\CategorySet;
 use App\Models\Recurring;
 use App\Models\Transaction;
-use App\Models\User;
 use App\Notifications\BudgetAlert;
 use App\Services\Notifications\NotifyBudgetAlerts;
 use App\Services\Plaid\SyncPlaidItem;
@@ -101,8 +100,8 @@ it('stays quiet for a skipped period', function () {
 
 it('stays quiet while its owner has budget alerts turned off', function () {
     Notification::fake();
-    $user = User::factory()->create(['notification_preferences' => ['budget_alert' => []]]);
-    $groceries = groceriesBudget($this->account, $this->groceries, ['user_id' => $user->id]);
+    $this->account->plaidItem->user->forceFill(['notification_preferences' => ['budget_alert' => []]])->save();
+    $groceries = groceriesBudget($this->account, $this->groceries);
     spendOn($this->account, $this->groceries, 180.00);
 
     checkBudgets($this->account);

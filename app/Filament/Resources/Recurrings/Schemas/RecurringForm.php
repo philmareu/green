@@ -88,6 +88,7 @@ class RecurringForm
             DatePicker::make('starts_on')
                 ->label(fn (Get $get): string => $isFlex($get) ? 'First period starts' : 'First due date')
                 ->default(today())
+                ->minDate(Recurring::EARLIEST_START)
                 ->required(),
             DatePicker::make('ends_on')
                 ->label('Ends on')

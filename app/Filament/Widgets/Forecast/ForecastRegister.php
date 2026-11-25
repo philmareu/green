@@ -144,6 +144,7 @@ class ForecastRegister extends TableWidget
                     ->required(),
                 DatePicker::make('date')
                     ->default(today())
+                    ->minDate(Recurring::EARLIEST_START)
                     ->required(),
                 TextInput::make('payee')
                     ->label('Payee contains')

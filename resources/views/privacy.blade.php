@@ -65,7 +65,7 @@
 <body>
     <main>
         <h1>Privacy policy</h1>
-        <p class="muted">Green · Last updated November 15, 2026</p>
+        <p class="muted">Green · Last updated November 25, 2026</p>
 
         <p>
             Green is an open-source personal finance app. This copy of Green is run privately by its owner
@@ -80,6 +80,7 @@
             <li>What you add yourself, such as Books, categories, recurring bills, budgets, expected income and reminders.</li>
             <li>A log of Green's activity with Plaid, so sync problems can be spotted: for each sync, live balance check, bank link or removal, the bank's name, when it ran and what started it, how long it took, how many transactions it added, updated or removed, whether it worked (with Plaid's error code and message if not), and Plaid's ID for each request. The log never holds access tokens or any transaction details, and each entry is deleted after 14 days.</li>
             <li>Your notification settings, and the alerts Green shows you, which can include an account's name, last few digits and balance, a bill's name, due date, amount and your reminder note, or a budget's spending. Alerts stay until you clear them, even if you remove the bank connection.</li>
+            <li>An error log on the server. When something fails, the entry can include what Green was working on at the time, such as a transaction it could not save. The owner of this installation decides how long the log is kept.</li>
         </ul>
         <p>
             Green never sees your bank username or password: you enter them with Plaid. It doesn't request full account
@@ -105,8 +106,16 @@
 
         <h2>Where it's kept and how it's protected</h2>
         <p>
-            On this installation's own server and database. Green is served over HTTPS, encrypts Plaid access tokens
-            and two-factor secrets, and requires two-factor sign-in. Each user sees only their own data.
+            On this installation's own server and database. Green encrypts Plaid access tokens and two-factor
+            secrets, and each user sees only their own data.
+            @if (request()->isSecure())
+                This site is served over HTTPS.
+            @endif
+            @if (filament()->getPanel('admin')->isMultiFactorAuthenticationRequired())
+                Everyone signs in with a password and a code from an authenticator app.
+            @else
+                Every user can add a code from an authenticator app to their sign-in.
+            @endif
         </p>
 
         <h2>How long it's kept, and deleting it</h2>

@@ -40,7 +40,7 @@ class AccountWentNegative extends Notification implements ShouldQueue
     public function toDatabase(User $notifiable): array
     {
         return FilamentNotification::make()
-            ->title("{$this->account->display_name} is negative")
+            ->title(e("{$this->account->display_name} is negative"))
             ->body('Available balance: '.Number::currency($this->balance, $this->account->currency))
             ->danger()
             ->icon(Heroicon::OutlinedExclamationTriangle)

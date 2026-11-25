@@ -47,8 +47,8 @@ class PlaidActions
                     $result = $sync->handle($item);
 
                     Notification::make()
-                        ->title(($item->institution_name ?? 'Bank').($result->successful ? ' synced' : ' sync failed'))
-                        ->body($result->summary())
+                        ->title(e($item->institution_name ?? 'Bank').($result->successful ? ' synced' : ' sync failed'))
+                        ->body(e($result->summary()))
                         ->status($result->successful ? 'success' : 'danger')
                         ->send();
                 }
@@ -78,7 +78,7 @@ class PlaidActions
                 try {
                     $refresh->handle($record->plaidItem, [$record->plaid_account_id]);
                 } catch (PlaidException $e) {
-                    Notification::make()->title('Could not refresh balance')->body($e->userMessage())->danger()->send();
+                    Notification::make()->title('Could not refresh balance')->body(e($e->userMessage()))->danger()->send();
 
                     return;
                 }
@@ -114,7 +114,7 @@ class PlaidActions
                 try {
                     $remove->handle($record);
                 } catch (PlaidException $e) {
-                    Notification::make()->title('Could not remove connection')->body($e->userMessage())->danger()->send();
+                    Notification::make()->title('Could not remove connection')->body(e($e->userMessage()))->danger()->send();
 
                     return;
                 }
