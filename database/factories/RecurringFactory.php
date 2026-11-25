@@ -39,6 +39,30 @@ class RecurringFactory extends Factory
         return $this->state(fn () => ['kind' => RecurringKind::Income, 'name' => 'Retainer', 'payee' => 'acme', 'amount' => 2500]);
     }
 
+    /**
+     * A bill that's paid automatically, so the lists don't flag it.
+     */
+    public function autopay(): static
+    {
+        return $this->state(fn () => ['autopay' => true]);
+    }
+
+    /**
+     * Matches a payment of any amount, for bills that vary.
+     */
+    public function anyAmount(): static
+    {
+        return $this->state(fn () => ['amount_tolerance' => null]);
+    }
+
+    /**
+     * A flex spend that carries what's left, or overspent, into the next period.
+     */
+    public function rollsOver(): static
+    {
+        return $this->state(fn () => ['rolls_over' => true]);
+    }
+
     public function flex(Category $category): static
     {
         return $this->state(fn () => [

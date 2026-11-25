@@ -55,6 +55,67 @@ class PlaidLogFactory extends Factory
         ]);
     }
 
+    /**
+     * Started by someone pressing "Sync now" rather than by the scheduler.
+     */
+    public function manual(): static
+    {
+        return $this->state(fn () => ['triggered_by' => PlaidLogTrigger::Manual]);
+    }
+
+    /**
+     * A bank being linked. The first sync that follows is an entry of its own.
+     */
+    public function link(): static
+    {
+        return $this->state(fn () => [
+            'kind' => PlaidLogKind::Link,
+            'triggered_by' => PlaidLogTrigger::Manual,
+            'pages' => null,
+            'added' => null,
+            'modified' => null,
+            'removed' => null,
+            'requests' => [
+                $this->request('/item/public_token/exchange'),
+                $this->request('/accounts/get'),
+            ],
+        ]);
+    }
+
+    /**
+     * The sync that follows a link and loads the bank's history, over
+     * several pages.
+     */
+    public function firstSync(int $added, int $pages = 2): static
+    {
+        return $this->state(fn () => [
+            'triggered_by' => PlaidLogTrigger::Link,
+            'pages' => $pages,
+            'added' => $added,
+            'modified' => 0,
+            'requests' => array_map(fn () => $this->request('/transactions/sync'), range(1, $pages)),
+        ]);
+    }
+
+    /**
+     * A bank being removed. The entry outlives the connection and keeps only
+     * the bank's name, so give it its user with `for()`.
+     */
+    public function removal(string $institutionName): static
+    {
+        return $this->state(fn () => [
+            'plaid_item_id' => null,
+            'institution_name' => $institutionName,
+            'kind' => PlaidLogKind::Remove,
+            'triggered_by' => PlaidLogTrigger::Manual,
+            'pages' => null,
+            'added' => null,
+            'modified' => null,
+            'removed' => null,
+            'requests' => [$this->request('/item/remove')],
+        ]);
+    }
+
     public function liveBalance(): static
     {
         return $this->state(fn () => [

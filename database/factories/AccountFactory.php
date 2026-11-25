@@ -46,6 +46,15 @@ class AccountFactory extends Factory
         ]);
     }
 
+    public function savings(): static
+    {
+        return $this->state(fn () => [
+            'name' => 'Plaid Saving',
+            'official_name' => 'Plaid Silver Standard 0.1% Interest Saving',
+            'subtype' => 'savings',
+        ]);
+    }
+
     public function credit(): static
     {
         return $this->state(fn () => [

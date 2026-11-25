@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\PlaidItemStatus;
 use App\Models\PlaidItem;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -23,6 +24,17 @@ class PlaidItemFactory extends Factory
             'institution_name' => 'First Platypus Bank',
             'status' => PlaidItemStatus::Active,
         ];
+    }
+
+    /**
+     * Synced at least once, with its transaction history fully loaded.
+     */
+    public function synced(?CarbonInterface $at = null): static
+    {
+        return $this->state(fn () => [
+            'last_synced_at' => $at ?? now(),
+            'transactions_update_status' => 'HISTORICAL_UPDATE_COMPLETE',
+        ]);
     }
 
     public function loginRequired(): static

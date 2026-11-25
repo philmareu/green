@@ -2,23 +2,19 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
-     * Creates a local development login: test@example.com / password.
-     * Run `php artisan db:seed --class=DemoSeeder` for sample Books and data.
+     * Loads the demo: sample Books, banks, transactions and recurring items
+     * under the login test@example.com / password. See `DemoSeeder`.
+     *
+     * This seeder must not use `WithoutModelEvents`: it would switch model
+     * events off for the demo too, and categorizing and matching run from them.
      */
     public function run(): void
     {
-        User::query()->firstOrCreate(
-            ['email' => 'test@example.com'],
-            User::factory()->raw(['name' => 'Test User', 'email' => 'test@example.com']),
-        );
+        $this->call(DemoSeeder::class);
     }
 }
