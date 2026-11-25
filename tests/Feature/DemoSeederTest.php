@@ -155,7 +155,9 @@ it('lets the demo login sign in and renders each main page', function () {
         CategorySetResource::getUrl() => ['Business', 'Personal'],
         CategorySetResource::getUrl('view', ['record' => $personal->categorySet]) => ['Groceries', 'costco'],
         RecurringResource::getUrl() => ['Water and sewer', 'Overdue', '$968.00'],
-        RecurringResource::getUrl('view', ['record' => $recurring('Rent')]) => ['Linked by you', 'Move the rent over from savings'],
+        RecurringResource::getUrl('view', ['record' => $recurring('Rent')]) => ['Linked by you'],
+        // The Reminders tab, which is not the one the page opens on.
+        RecurringResource::getUrl('view', ['record' => $recurring('Rent'), 'relation' => 1]) => ['Add reminder', 'Move the rent over from savings'],
         RecurringResource::getUrl('view', ['record' => $recurring('Eating out')]) => ['$104.50', 'rolled over'],
         Forecast::getUrl() => ['Everyday Checking ••4242', '$212.62', 'Overdue since'],
         PlaidItemResource::getUrl() => ['Tattersall Federal Credit Union', 'Reconnect required'],
